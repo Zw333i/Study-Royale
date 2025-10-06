@@ -1,0 +1,11 @@
+node_modules/
+.env
+serviceAccountKey.json
+uploads/
+
+node_modules/
+package-lock.json
+
+.vscode/
+*.log
+npm-debug.log*

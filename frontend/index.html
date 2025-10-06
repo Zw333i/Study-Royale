@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Study Royale - Master Your Knowledge</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Auth Page -->
+    <div id="authPage" class="page">
+        <div class="auth-container">
+            <div class="logo-section">
+                <div class="crown-container">
+                    <div class="king">
+                        <div class="crown">
+                            <div class="crown top-left"></div>
+                            <div class="crown top-middle"></div>
+                            <div class="crown top-right"></div>
+                            <div class="crown back-left"></div>
+                            <div class="crown back-right"></div>
+                            <div class="crown middle"></div>
+                            <div class="crown bottom"></div>
+                        </div>
+                        <div class="jewel">
+                            <div class="jewel red left"></div>
+                            <div class="jewel blue"></div>
+                            <div class="jewel red right"></div>
+                        </div>
+                    </div>
+                </div>
+                <h1 class="brand-title">Study Royale</h1>
+                <p class="brand-subtitle">Master Your Knowledge, Rule Your Exams</p>
+            </div>
+
+            <div id="alertContainer"></div>
+
+<!-- Login Form -->
+            <div id="loginForm" class="auth-form">
+                <h2>Welcome Back</h2>
+                <form onsubmit="login(event)">
+                    <div class="input-group">
+                        <input required="" type="email" id="loginEmail" name="email" autocomplete="email" class="input">
+                        <label class="user-label">Email Address</label>
+                    </div>
+                    <div class="input-group password-input-group">
+                        <input required="" type="password" id="loginPassword" name="password" autocomplete="current-password" class="input">
+                        <label class="user-label">Password</label>
+                        <button type="button" class="password-toggle" onclick="togglePassword('loginPassword')">
+                            <svg class="eye-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                    </div>
+                    <button type="submit" class="btn-primary">Sign In</button>
+                </form>
+
+                <div class="divider">
+                    <span>or continue with</span>
+                </div>
+
+                <button class="btn-social" onclick="googleSignIn()">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 48 48">
+                        <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"></path>
+                        <path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"></path>
+                        <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"></path>
+                        <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"></path>
+                    </svg>
+                    Sign in with Google
+                </button>
+                <button class="btn-social" onclick="showPhoneAuth()">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+                        <line x1="12" y1="18" x2="12.01" y2="18"></line>
+                    </svg>
+                    Sign in with Phone
+                </button>
+
+                <div class="auth-switch">
+                    Don't have an account? <a onclick="showSignup()">Create one</a>
+                </div>
+            </div>
+
+            <!-- Signup Form -->
+            <div id="signupForm" class="auth-form hidden">
+                <h2>Create Account</h2>
+                <form onsubmit="signup(event)">
+                    <div class="input-group">
+                        <input required="" type="text" id="signupName" name="name" autocomplete="name" class="input">
+                        <label class="user-label">Display Name</label>
+                    </div>
+                    <div class="input-group">
+                        <input required="" type="email" id="signupEmail" name="email" autocomplete="email" class="input">
+                        <label class="user-label">Email Address</label>
+                    </div>
+                    <div class="input-group password-input-group">
+                        <input required="" type="password" id="signupPassword" name="password" autocomplete="new-password" class="input">
+                        <label class="user-label">Password (min. 6 characters)</label>
+                        <button type="button" class="password-toggle" onclick="togglePassword('signupPassword')">
+                            <svg class="eye-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                    </div>
+                    <button type="submit" class="btn-primary">Create Account</button>
+                </form>
+
+                <div class="divider">
+                    <span>or sign up with</span>
+                </div>
+
+                <button class="btn-social" onclick="googleSignIn()">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 48 48">
+                        <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"></path>
+                        <path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"></path>
+                        <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"></path>
+                        <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"></path>
+                    </svg>
+                    Sign up with Google
+                </button>
+                <button class="btn-social" onclick="showPhoneAuth()">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+                        <line x1="12" y1="18" x2="12.01" y2="18"></line>
+                    </svg>
+                    Sign up with Phone
+                </button>
+
+                <div class="auth-switch">
+                    Already have an account? <a onclick="showLogin()">Sign in</a>
+                </div>
+            </div>
+
+            <!-- Phone Auth Form -->
+            <div id="phoneForm" class="auth-form hidden">
+                <h2>Phone Verification</h2>
+                <div class="form-group">
+                    <label>Phone Number</label>
+                    <input type="tel" id="phoneNumber" placeholder="+639171234567">
+                    <small>Philippines format: +63 followed by 10 digits (e.g., +639171234567)</small>
+                </div>
+                <div id="recaptcha-container"></div>
+                <button class="btn-primary" onclick="sendVerificationCode()" id="sendCodeBtn">Send Code</button>
+
+                <div id="verificationCodeSection" class="hidden">
+                    <div class="form-group">
+                        <label>Verification Code</label>
+                        <input type="text" id="verificationCode" placeholder="6-digit code">
+                    </div>
+                    <button class="btn-primary" onclick="verifyPhoneCode()">Verify</button>
+                </div>
+
+                <div class="auth-switch">
+                    <a onclick="showLogin()">Back to login</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div id="appPage" class="page">
+        <!-- Navigation Bar -->
+        <nav class="navbar">
+            <div class="nav-brand">
+                <div class="crown-container-nav">
+                    <div class="king">
+                        <div class="crown">
+                            <div class="crown top-left"></div>
+                            <div class="crown top-middle"></div>
+                            <div class="crown top-right"></div>
+                            <div class="crown back-left"></div>
+                            <div class="crown back-right"></div>
+                            <div class="crown middle"></div>
+                            <div class="crown bottom"></div>
+                        </div>
+                        <div class="jewel">
+                            <div class="jewel red left"></div>
+                            <div class="jewel blue"></div>
+                            <div class="jewel red right"></div>
+                        </div>
+                    </div>
+                </div>
+                <p class="brand-name">,,,,,     Study Royale</p>
+            </div>
+            <div class="nav-menu">
+                <a href="#" class="nav-item active" data-page="upload">Upload</a>
+                <a href="#" class="nav-item" data-page="import">Import</a>
+                <a href="#" class="nav-item" data-page="materials">My Materials</a>
+            </div>
+            <div class="nav-user">
+                <label for="switch" class="switch">
+                    <input id="switch" type="checkbox" onchange="toggleDarkMode()" />
+                    <span class="slider"></span>
+                    <span class="decoration"></span>
+                </label>
+                <div class="user-dropdown">
+                    <button class="user-button" onclick="toggleUserMenu()">
+                        <span id="userName">User</span>
+                        <span class="dropdown-arrow">▼</span>
+                    </button>
+                    <div class="dropdown-menu" id="userMenu">
+                        <button onclick="logout()">Logout</button>
+                    </div>
+                </div>
+            </div>
+        </nav>
+        
+        <!-- Upload Section -->
+        <div id="uploadSection" class="section active">
+            <div class="container">
+                <div class="page-header">
+                    <h1>Upload Study Material</h1>
+                    <p>Upload your notes, textbooks, or study guides to generate quizzes</p>
+                </div>
+
+                <div class="upload-card">
+                    <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+                        <div class="upload-icon">📄</div>
+                        <h3>Choose your study file(s)</h3>
+                        <p>PDF, DOCX, or TXT (Maximum of 20MB per file)</p>
+                        <input type="file" id="fileInput" accept=".pdf,.docx,.txt" onchange="handleFileSelect(this)" multiple hidden>
+                        <div id="fileNames" class="file-names"></div>
+                    </div>
+
+                    <div class="upload-form">
+                        <div class="form-group">
+                            <label>Exam Date</label>
+                            <input type="date" id="examDate" class="form-control">
+                        </div>
+                        
+                        <div id="mergeOptionsContainer" class="form-group" style="display: none;">
+                            <label>Multiple Files Detected</label>
+                            <select id="mergeOption" class="form-control">
+                                <option value="merge">Merge Files</option>
+                                <option value="separate">Keep Separate</option>
+                            </select>
+                        </div>
+
+                        <button class="btn-primary btn-block" onclick="uploadFiles()" id="uploadBtn">
+                            Upload
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Import Quiz Section -->
+        <div id="importSection" class="section">
+            <div class="container">
+                <div class="page-header">
+                    <h1>Import Your Own Quiz</h1>
+                    <p>Import pre-made questions with answers to practice on this platform</p>
+                </div>
+
+                <div class="upload-card">
+                    <div class="form-group">
+                        <label>Quiz Title</label>
+                        <input type="text" id="importTitle" class="form-control" placeholder="">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Quiz Type</label>
+                        <select id="importQuizType" class="form-control" onchange="updateImportExample()">
+                            <option value="multiple-choice">Multiple Choice</option>
+                            <option value="identification">Identification</option>
+                            <option value="true-false">True or False</option>
+                            <option value="enumeration">Enumeration</option>
+                            <option value="association">Association</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" id="associationTypeGroup" style="display: none;">
+                        <label>Association Question Type</label>
+                        <select id="associationType" class="form-control">
+                            <option value="except">EXCEPT Questions (All are X except...)</option>
+                            <option value="odd-one-out">Odd One Out (Which does NOT belong?)</option>
+                            <option value="mix">Mix of Both</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Paste Your Questions Here</label>
+                        <textarea id="importQuestions" class="form-control import-textarea" rows="12" placeholder="Format below..."></textarea>
+                    </div>
+
+                    <div class="import-example" id="importExample">
+                        <h4>Format Example (Multiple Choice):</h4>
+                        <pre>1. What is the powerhouse of the cell?
+A) Nucleus
+B) Mitochondria
+C) Ribosome
+D) Golgi apparatus
+Answer: B
+</pre>
+                    </div>
+
+                    <button class="btn-primary btn-large" onclick="importQuiz()" id="importBtn">Import Quiz</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Materials Section -->
+        <div id="materialsSection" class="section">
+            <div class="container">
+                <div class="page-header">
+                    <h1>My Study Materials</h1>
+                    <button class="btn-secondary" onclick="loadReviewers()">Refresh</button>
+                </div>
+
+                <div id="reviewersList" class="materials-grid"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quiz Page -->
+    <div id="quizPage" class="page">
+        <nav class="navbar">
+            <div class="nav-brand">
+                <div class="crown-container-nav">
+                    <div class="king">
+                        <div class="crown">
+                            <div class="crown top-left"></div>
+                            <div class="crown top-middle"></div>
+                            <div class="crown top-right"></div>
+                            <div class="crown back-left"></div>
+                            <div class="crown back-right"></div>
+                            <div class="crown middle"></div>
+                            <div class="crown bottom"></div>
+                        </div>
+                        <div class="jewel">
+                            <div class="jewel red left"></div>
+                            <div class="jewel blue"></div>
+                            <div class="jewel red right"></div>
+                        </div>
+                    </div>
+                </div>
+                <span class="brand-name">Study Royale</span>
+            </div>
+            <div class="nav-menu">
+                <button class="btn-back" onclick="exitQuiz()">← Back to Materials</button>
+            </div>
+        </nav>
+
+        <div class="container quiz-container">
+            <div class="quiz-header">
+                <h1 id="quizTitle">Quiz</h1>
+                <div id="quizProgress"></div>
+            </div>
+            <div id="quizContent"></div>
+            <div class="quiz-actions">
+                <button class="btn-secondary" onclick="exitQuiz()">Exit Quiz</button>
+                <button class="btn-primary" onclick="submitQuiz()" id="submitBtn">Submit Answers</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quiz Settings Modal -->
+    <div id="quizModal" class="modal">
+        <div class="modal-overlay" onclick="closeModal()"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Quiz Settings</h2>
+                <button class="modal-close" onclick="closeModal()">×</button>
+            </div>
+
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Select Quiz Type</label>
+                    <div class="quiz-types">
+                        <button type="button" class="quiz-type-btn" data-type="identification">
+                            <span class="type-icon">📝</span>
+                            <span>Identification</span>
+                        </button>
+                        <button type="button" class="quiz-type-btn" data-type="multiple-choice">
+                            <span class="type-icon">✅</span>
+                            <span>Multiple Choice</span>
+                        </button>
+                        <button type="button" class="quiz-type-btn" data-type="true-false">
+                            <span class="type-icon">✓</span>
+                            <span>True or False</span>
+                        </button>
+                        <button type="button" class="quiz-type-btn" data-type="association">
+                            <span class="type-icon">🔗</span>
+                            <span>Association</span>
+                        </button>
+                        <button type="button" class="quiz-type-btn" data-type="matching">
+                            <span class="type-icon">🔀</span>
+                            <span>Matching Type</span>
+                        </button>
+                        <button type="button" class="quiz-type-btn" data-type="flashcard">
+                            <span class="type-icon">🃏</span>
+                            <span>Flashcards</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Number of Questions</label>
+                    <input type="number" id="questionCount" class="form-control" value="10" min="1" max="50">
+                </div>
+
+                <div class="form-group" id="modalAssociationTypeGroup" style="display: none;">
+                    <label>Association Question Type</label>
+                    <select id="modalAssociationType" class="form-control">
+                        <option value="except">EXCEPT Questions (All are X except...)</option>
+                        <option value="odd-one-out">Odd One Out (Which does NOT belong?)</option>
+                        <option value="mix">Mix of Both</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Special Instructions (Optional)</label>
+                    <textarea id="specialInstructions" class="form-control" rows="3" placeholder="e.g., Focus on definitions, include calculations, make it challenging..."></textarea>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+                <button class="btn-primary" onclick="generateWithSettings()">Generate Quiz</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
