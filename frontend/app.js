@@ -1,7 +1,7 @@
 // app.js
 const API_URL = window.location.hostname === 'localhost'
   ? 'http://localhost:3000/api'
-  : 'study-royale.up.railway.app/api';
+  : 'https://study-royale.up.railway.app/api';
 let currentUser = null;
 let currentReviewerId = null;
 let selectedQuizType = null;
