@@ -27,7 +27,7 @@ body.light-mode {
     --cream: #2D3748;
     --baby-blue: #5494de;
     --yellow: #D4AF37;
-    --white: #2D3748;
+    --white: hsl(0, 0%, 100%);
     --text-light: #2D3748;
     --text-muted: #718096;
     --card-bg: #FFFFFF;
@@ -136,7 +136,7 @@ body {
 .nav-brand {
     display: flex;
     align-items: center;
-    gap: 15px;
+    gap: 40px;
     font-size: 24px;
     font-weight: 700;
 }
@@ -146,6 +146,7 @@ body {
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     white-space: nowrap;
+    margin-left: 13px;
 }
 
 .crown-container-nav {
@@ -1757,4 +1758,5 @@ input:checked + .slider:before {
     .score-display {
         font-size: 48px;
     }
+    
 }
