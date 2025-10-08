@@ -1,10 +1,11 @@
-// app.js
+// app.js - Complete Enhanced Version
 const API_URL = window.location.hostname === 'localhost'
   ? 'http://localhost:3000/api'
   : 'https://study-royale.up.railway.app/api';
+
 let currentUser = null;
 let currentReviewerId = null;
-let selectedQuizType = null;
+let selectedQuizTypes = []; // Changed to array for multi-select
 let currentQuestions = [];
 let userToken = null;
 let confirmationResult = null;
@@ -12,26 +13,7 @@ let currentFlashcardIndex = 0;
 let matchingSelections = { column1: null, column2: null };
 let matchedPairs = [];
 let importedQuizzes = [];
-
-// Load imported quizzes from database
-async function loadImportedQuizzes() {
-    if (!userToken) return;
-    
-    try {
-        const response = await fetch(`${API_URL}/imported-quiz`, {
-            headers: {
-                'Authorization': `Bearer ${userToken}`
-            }
-        });
-        const data = await response.json();
-        
-        if (data.success) {
-            importedQuizzes = data.quizzes;
-        }
-    } catch (error) {
-        console.error('Failed to load imported quizzes:', error);
-    }
-}
+let quizSubmitted = false;
 
 // ===== SESSION TIMEOUT =====
 let sessionTimeout;
@@ -102,7 +84,6 @@ document.addEventListener('DOMContentLoaded', () => {
         examDateInput.min = new Date().toISOString().split('T')[0];
     }
     
-    // Check if light mode is preferred (default is dark mode)
     const lightModeEnabled = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
     if (lightModeEnabled) {
         document.body.classList.add('light-mode');
@@ -267,7 +248,9 @@ auth.getRedirectResult().then((result) => {
         showAlert('Signed in with Google successfully!');
     }
 }).catch((error) => {
-    if (error.code !== 'auth/popup-closed-by-user') {
+    // Silently ignore redirect errors in unsupported environments
+    if (error.code !== 'auth/popup-closed-by-user' && 
+        error.code !== 'auth/operation-not-supported-in-this-environment') {
         console.error('Redirect result error:', error);
     }
 });
@@ -360,7 +343,6 @@ async function logout() {
     }
 }
 
-// ===== UI FUNCTIONS =====
 // ===== UI FUNCTIONS =====
 function showAlert(message, type = 'success') {
     const container = document.getElementById('alertContainer');
@@ -497,7 +479,6 @@ async function uploadFiles() {
                 const formData = new FormData();
                 formData.append('file', fileInput.files[i]);
                 formData.append('examDate', examDate);
-                formData.append('mergeMode', 'separate');
 
                 const response = await fetch(`${API_URL}/upload`, {
                     method: 'POST',
@@ -524,7 +505,6 @@ async function uploadFiles() {
                 formData.append('files', fileInput.files[i]);
             }
             formData.append('examDate', examDate);
-            formData.append('mergeMode', 'merge');
 
             const response = await fetch(`${API_URL}/upload/upload-merged`, {
                 method: 'POST',
@@ -617,6 +597,14 @@ A) Apple
 B) Banana
 C) Carrot
 D) Orange
+Answer: C
+
+3. Statement 1: Earth revolves around Sun
+   Statement 2: Moon revolves around Earth
+A) If statement 1 is true
+B) If statement 2 is true
+C) If both are true
+D) If neither is true
 Answer: C</pre>`
     };
     
@@ -663,8 +651,6 @@ async function saveImportedQuizToDatabase(title, type, questionsText, associatio
         });
 
         const data = await response.json();
-        
-        console.log('Server response:', data);
 
         if (data.success) {
             showAlert(`Quiz "${title}" imported successfully with ${data.questionCount} questions!`);
@@ -687,7 +673,26 @@ async function saveImportedQuizToDatabase(title, type, questionsText, associatio
     }
 }
 
-// ===== LOAD REVIEWERS =====
+// ===== LOAD REVIEWERS & IMPORTED QUIZZES =====
+async function loadImportedQuizzes() {
+    if (!userToken) return;
+    
+    try {
+        const response = await fetch(`${API_URL}/imported-quiz`, {
+            headers: {
+                'Authorization': `Bearer ${userToken}`
+            }
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+            importedQuizzes = data.quizzes;
+        }
+    } catch (error) {
+        console.error('Failed to load imported quizzes:', error);
+    }
+}
+
 async function loadReviewers() {
     const listContainer = document.getElementById('reviewersList');
     listContainer.innerHTML = '<div class="loading"><div class="spinner"></div><p class="loading-text">Loading your materials...</p></div>';
@@ -706,10 +711,10 @@ async function loadReviewers() {
             materialsHTML += importedQuizzes.map(quiz => `
                 <div class="material-card">
                     <div class="material-header">
-                        <div class="material-icon">📝</div>
+                        <div class="material-icon">📚</div>
                         <div class="material-info">
                             <h3>${quiz.title}</h3>
-                            <p>📚 Imported ${quiz.type.replace('-', ' ')} • ${quiz.questions.length} questions</p>
+                            <p>📝 Imported ${quiz.type.replace('-', ' ')} • ${quiz.questions.length} questions</p>
                         </div>
                     </div>
                     <div class="material-actions">
@@ -755,6 +760,7 @@ async function loadReviewers() {
     }
 }
 
+// ===== START IMPORTED QUIZ =====
 function startImportedQuiz(quizId) {
     const quiz = importedQuizzes.find(q => q.id === quizId);
     if (!quiz) {
@@ -763,6 +769,7 @@ function startImportedQuiz(quizId) {
     }
     
     currentQuestions = quiz.questions;
+    quizSubmitted = false;
     showQuizPage();
     
     const quizTitle = document.getElementById('quizTitle');
@@ -770,7 +777,7 @@ function startImportedQuiz(quizId) {
     
     quizTitle.textContent = quiz.title;
     
-    if (quiz.type === 'multiple-choice') {
+    if (quiz.type === 'multiple-choice' || quiz.type === 'association') {
         quizContent.innerHTML = displayImportedMultipleChoice(quiz.questions);
     } else if (quiz.type === 'identification') {
         quizContent.innerHTML = displayImportedIdentification(quiz.questions);
@@ -778,8 +785,6 @@ function startImportedQuiz(quizId) {
         quizContent.innerHTML = displayImportedTrueFalse(quiz.questions);
     } else if (quiz.type === 'enumeration') {
         quizContent.innerHTML = displayImportedEnumeration(quiz.questions);
-    } else if (quiz.type === 'association') {
-        quizContent.innerHTML = displayImportedMultipleChoice(quiz.questions);
     }
 }
 
@@ -870,10 +875,36 @@ async function deleteImportedQuizFromDatabase(quizId) {
     }
 }
 
-// ===== QUIZ FUNCTIONS =====
+// ===== MULTI-SELECT QUIZ TYPE HANDLER =====
+function toggleQuizType(button) {
+    const type = button.getAttribute('data-type');
+    
+    if (button.classList.contains('selected')) {
+        button.classList.remove('selected');
+        selectedQuizTypes = selectedQuizTypes.filter(t => t !== type);
+    } else {
+        button.classList.add('selected');
+        selectedQuizTypes.push(type);
+    }
+    
+    // Update counter
+    const quizTypesContainer = document.querySelector('.quiz-types');
+    quizTypesContainer.setAttribute('data-selected', selectedQuizTypes.length);
+    
+    // Show association dropdown if association is selected
+    const modalAssociationGroup = document.getElementById('modalAssociationTypeGroup');
+    if (selectedQuizTypes.includes('association')) {
+        modalAssociationGroup.style.display = 'block';
+    } else {
+        modalAssociationGroup.style.display = 'none';
+    }
+}
+
+// ===== START QUIZ =====
 function startQuiz(reviewerId) {
     currentReviewerId = reviewerId;
-    selectedQuizType = null;
+    selectedQuizTypes = [];
+    quizSubmitted = false;
     
     document.querySelectorAll('.quiz-type-btn').forEach(btn => {
         btn.classList.remove('selected');
@@ -884,19 +915,13 @@ function startQuiz(reviewerId) {
         newBtn.addEventListener('click', function(e) {
             e.preventDefault();
             e.stopPropagation();
-            
-            document.querySelectorAll('.quiz-type-btn').forEach(b => b.classList.remove('selected'));
-            this.classList.add('selected');
-            selectedQuizType = this.getAttribute('data-type');
-            
-            const modalAssociationGroup = document.getElementById('modalAssociationTypeGroup');
-            if (selectedQuizType === 'association') {
-                modalAssociationGroup.style.display = 'block';
-            } else {
-                modalAssociationGroup.style.display = 'none';
-            }
+            toggleQuizType(this);
         });
     });
+    
+    // Reset counter
+    const quizTypesContainer = document.querySelector('.quiz-types');
+    quizTypesContainer.setAttribute('data-selected', '0');
     
     document.getElementById('questionCount').value = '10';
     document.getElementById('specialInstructions').value = '';
@@ -914,8 +939,8 @@ function closeModal() {
 }
 
 async function generateWithSettings() {
-    if (!selectedQuizType) {
-        showAlert('Please select a quiz type', 'error');
+    if (selectedQuizTypes.length === 0) {
+        showAlert('Please select at least one quiz type', 'error');
         return;
     }
 
@@ -923,21 +948,31 @@ async function generateWithSettings() {
     const instructions = document.getElementById('specialInstructions').value.trim();
     
     let associationType = 'mix';
-    if (selectedQuizType === 'association') {
+    if (selectedQuizTypes.includes('association')) {
         associationType = document.getElementById('modalAssociationType').value;
     }
     
-    const quizType = selectedQuizType;
+    // Store types before clearing
+    const typesToGenerate = [...selectedQuizTypes];
+    
+    const requestBody = {
+        reviewerId: currentReviewerId,
+        questionTypes: typesToGenerate,
+        count: parseInt(count),
+        specialInstructions: instructions,
+        associationType: associationType
+    };
+    
+    console.log('Sending request:', requestBody);
     
     closeModal();
-    selectedQuizType = null;
     showQuizPage();
 
     const quizContent = document.getElementById('quizContent');
     const quizTitle = document.getElementById('quizTitle');
 
     quizContent.innerHTML = '<div class="loading"><div class="spinner"></div><p class="loading-text">Generating your quiz...</p></div>';
-    quizTitle.textContent = `Generating ${quizType} quiz...`;
+    quizTitle.textContent = `Generating ${typesToGenerate.length} type(s) of quiz...`;
 
     try {
         const response = await fetch(`${API_URL}/generate`, {
@@ -946,86 +981,47 @@ async function generateWithSettings() {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${userToken}`
             },
-            body: JSON.stringify({
-                reviewerId: currentReviewerId,
-                questionType: quizType,
-                count: parseInt(count),
-                format: 'default',
-                specialInstructions: instructions,
-                associationType: associationType
-            })
+            body: JSON.stringify(requestBody)
         });
 
         const data = await response.json();
+        console.log('Response:', data);
 
         if (data.success) {
-            quizTitle.textContent = `${quizType.charAt(0).toUpperCase() + quizType.slice(1).replace('-', ' ')} Quiz`;
-            displayQuestions(data.questions, quizType);
+            quizTitle.textContent = `Mixed Quiz (${typesToGenerate.join(', ')})`;
+            displayQuestions(data.questions, typesToGenerate);
         } else {
             quizContent.innerHTML = `<p style="color: var(--error); text-align: center;">Failed to generate questions: ${data.error}</p>`;
         }
     } catch (error) {
+        console.error('Request error:', error);
         quizContent.innerHTML = `<p style="color: var(--error); text-align: center;">Network error: ${error.message}</p>`;
     }
+    
+    // Clear after request is made
+    selectedQuizTypes = [];
 }
 
-function displayQuestions(questionsText, questionType) {
+// ===== DISPLAY QUESTIONS (MIXED TYPES) =====
+function displayQuestions(questionsText, questionTypes) {
     const quizContent = document.getElementById('quizContent');
     currentQuestions = [];
     
-    if (questionType === 'flashcard') {
+    if (questionTypes.includes('flashcard')) {
         displayFlashcards(questionsText);
         document.getElementById('submitBtn').style.display = 'none';
-    } else if (questionType === 'matching') {
+        return;
+    } else if (questionTypes.includes('matching')) {
         displayMatchingType(questionsText);
-    } else if (questionType === 'association') {
-        quizContent.innerHTML = parseAssociationQuestions(questionsText);
-    } else if (questionType === 'identification') {
-        quizContent.innerHTML = parseIdentificationQuestions(questionsText);
-    } else if (questionType === 'multiple-choice') {
-        quizContent.innerHTML = parseMultipleChoiceQuestions(questionsText);
-    } else if (questionType === 'true-false') {
-        quizContent.innerHTML = parseTrueFalseQuestions(questionsText);
-    } else {
-        quizContent.innerHTML = `<div class="question-card"><pre style="white-space: pre-wrap;">${questionsText}</pre></div>`;
+        return;
     }
-}
-
-function parseIdentificationQuestions(text) {
-    const lines = text.split('\n').filter(line => line.trim());
+    
+    const lines = questionsText.split('\n').filter(line => line.trim());
     let html = '';
     let questionNum = 1;
     
     for (let i = 0; i < lines.length; i++) {
-        if (lines[i].startsWith('Q:')) {
-            const question = lines[i].substring(2).trim();
-            const answer = lines[i + 1] && lines[i + 1].startsWith('A:') ? lines[i + 1].substring(2).trim() : '';
-            
-            currentQuestions.push({ question, answer, type: 'identification' });
-            
-            html += `
-                <div class="question-card">
-                    <span class="question-number">Question ${questionNum}</span>
-                    <div class="question-text">${question}</div>
-                    <input type="text" class="form-control" id="answer-${questionNum}" placeholder="Type your answer here">
-                    <div class="explanation" id="explain-${questionNum}">
-                        <strong>Correct Answer:</strong> ${answer}
-                    </div>
-                </div>
-            `;
-            questionNum++;
-        }
-    }
-    
-    return html || '<p>No questions could be parsed.</p>';
-}
-
-function parseMultipleChoiceQuestions(text) {
-    const lines = text.split('\n').filter(line => line.trim());
-    let html = '';
-    let questionNum = 1;
-    
-    for (let i = 0; i < lines.length; i++) {
+        // Multiple choice or association
         if (lines[i].startsWith('Q:')) {
             const question = lines[i].substring(2).trim();
             let options = [];
@@ -1040,34 +1036,26 @@ function parseMultipleChoiceQuestions(text) {
                 }
             }
             
-            currentQuestions.push({ question, options, correctAnswer, type: 'multiple-choice' });
-            
-            html += `
-                <div class="question-card">
-                    <span class="question-number">Question ${questionNum}</span>
-                    <div class="question-text">${question}</div>
-                    ${options.map(opt => `
-                        <div class="option" onclick="selectOption(this, ${questionNum})">${opt}</div>
-                    `).join('')}
-                    <div class="explanation" id="explain-${questionNum}">
-                        <strong>Correct Answer:</strong> ${correctAnswer}
+            if (options.length > 0) {
+                currentQuestions.push({ question, options, correctAnswer, type: 'multiple-choice' });
+                
+                html += `
+                    <div class="question-card">
+                        <span class="question-number">Question ${questionNum}</span>
+                        <div class="question-text">${question}</div>
+                        ${options.map(opt => `
+                            <div class="option" onclick="selectOption(this, ${questionNum})">${opt}</div>
+                        `).join('')}
+                        <div class="explanation" id="explain-${questionNum}">
+                            <strong>Correct Answer:</strong> ${correctAnswer}
+                        </div>
                     </div>
-                </div>
-            `;
-            questionNum++;
+                `;
+                questionNum++;
+            }
         }
-    }
-    
-    return html || '<p>No questions could be parsed.</p>';
-}
-
-function parseTrueFalseQuestions(text) {
-    const lines = text.split('\n').filter(line => line.trim());
-    let html = '';
-    let questionNum = 1;
-    
-    for (let i = 0; i < lines.length; i++) {
-        if (lines[i].startsWith('Statement:')) {
+        // True/False
+        else if (lines[i].startsWith('Statement:')) {
             const statement = lines[i].substring(10).trim();
             const answer = lines[i + 1] && lines[i + 1].startsWith('Answer:') ? lines[i + 1].substring(7).trim() : '';
             const explanation = lines[i + 2] && lines[i + 2].startsWith('Explanation:') ? lines[i + 2].substring(12).trim() : '';
@@ -1088,52 +1076,239 @@ function parseTrueFalseQuestions(text) {
             `;
             questionNum++;
         }
-    }
-    
-    return html || '<p>No questions could be parsed.</p>';
-}
-
-function parseAssociationQuestions(text) {
-    const lines = text.split('\n').filter(line => line.trim());
-    let html = '';
-    let questionNum = 1;
-    
-    for (let i = 0; i < lines.length; i++) {
-        if (lines[i].startsWith('Q:')) {
+        // Identification
+        else if (lines[i].match(/Q:.*_____/) || (lines[i].startsWith('Q:') && !lines[i+1]?.match(/^[A-D]\)/))) {
             const question = lines[i].substring(2).trim();
-            let options = [];
-            let correctAnswer = '';
+            const answer = lines[i + 1] && lines[i + 1].startsWith('A:') ? lines[i + 1].substring(2).trim() : '';
             
-            for (let j = i + 1; j < Math.min(i + 7, lines.length); j++) {
-                if (lines[j].match(/^[A-D]\)/)) {
-                    options.push(lines[j]);
-                }
-                if (lines[j].startsWith('Correct:') || lines[j].startsWith('Answer:')) {
-                    correctAnswer = lines[j].split(':')[1].trim();
-                }
-            }
-            
-            currentQuestions.push({ question, options, correctAnswer, type: 'association' });
-            
-            html += `
-                <div class="question-card">
-                    <span class="question-number">Question ${questionNum}</span>
-                    <div class="question-text">${question}</div>
-                    ${options.map(opt => `
-                        <div class="option" onclick="selectOption(this, ${questionNum})">${opt}</div>
-                    `).join('')}
-                    <div class="explanation" id="explain-${questionNum}">
-                        <strong>Correct Answer:</strong> ${correctAnswer}
+            if (answer) {
+                currentQuestions.push({ question, answer, type: 'identification' });
+                
+                html += `
+                    <div class="question-card">
+                        <span class="question-number">Question ${questionNum}</span>
+                        <div class="question-text">${question}</div>
+                        <input type="text" class="form-control" id="answer-${questionNum}" placeholder="Type your answer here">
+                        <div class="explanation" id="explain-${questionNum}">
+                            <strong>Correct Answer:</strong> ${answer}
+                        </div>
                     </div>
-                </div>
-            `;
-            questionNum++;
+                `;
+                questionNum++;
+            }
         }
     }
     
-    return html || '<p>No questions could be parsed.</p>';
+    quizContent.innerHTML = html || '<p>No questions could be parsed.</p>';
 }
 
+// ===== AI-POWERED ANSWER CHECKING =====
+async function checkAnswerWithAI(userAnswer, correctAnswer, questionText) {
+    try {
+        const response = await fetch(`${API_URL}/generate/check-answer`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${userToken}`
+            },
+            body: JSON.stringify({
+                userAnswer: userAnswer,
+                correctAnswer: correctAnswer,
+                questionText: questionText
+            })
+        });
+
+        const data = await response.json();
+        
+        if (data.success) {
+            return data.isCorrect;
+        }
+        
+        // Fallback to simple check
+        return userAnswer.toLowerCase().trim() === correctAnswer.toLowerCase().trim();
+    } catch (error) {
+        console.error('AI checking error:', error);
+        return userAnswer.toLowerCase().trim() === correctAnswer.toLowerCase().trim();
+    }
+}
+
+// ===== SUBMIT QUIZ WITH AI CHECKING =====
+async function submitQuiz() {
+    const questions = document.querySelectorAll('.question-card');
+    let correct = 0;
+    let total = 0;
+    
+    showAlert('Checking answers with AI...', 'success');
+    
+    for (const [idx, question] of Array.from(questions).entries()) {
+        total++;
+        
+        // Text input (identification)
+        const textInput = question.querySelector('input[type="text"]');
+        if (textInput) {
+            const userAnswer = textInput.value.trim();
+            const correctAnswer = currentQuestions[idx]?.answer || '';
+            const questionText = currentQuestions[idx]?.question || '';
+            
+            const isCorrect = await checkAnswerWithAI(userAnswer, correctAnswer, questionText);
+            
+            textInput.style.borderColor = isCorrect ? 'var(--success)' : 'var(--error)';
+            textInput.disabled = true;
+            
+            if (isCorrect) correct++;
+        }
+        
+        // Textarea (enumeration)
+        const textArea = question.querySelector('textarea');
+        if (textArea) {
+            const userAnswer = textArea.value.trim();
+            const correctAnswer = currentQuestions[idx]?.answer || '';
+            const questionText = currentQuestions[idx]?.question || '';
+            
+            const isCorrect = await checkAnswerWithAI(userAnswer, correctAnswer, questionText);
+            
+            textArea.style.borderColor = isCorrect ? 'var(--success)' : 'var(--error)';
+            textArea.disabled = true;
+            
+            if (isCorrect) correct++;
+        }
+        
+        // Multiple choice options
+        const selectedOption = question.querySelector('.option.selected');
+        if (selectedOption) {
+            const userAnswer = selectedOption.textContent.trim();
+            const correctAnswer = currentQuestions[idx]?.correctAnswer || currentQuestions[idx]?.answer || '';
+            const isCorrect = userAnswer.charAt(0) === correctAnswer.charAt(0) || userAnswer === correctAnswer;
+            
+            if (isCorrect) {
+                selectedOption.classList.add('correct');
+                correct++;
+            } else {
+                selectedOption.classList.add('incorrect');
+            }
+        }
+    }
+    
+    if (total > 0) {
+        const percentage = ((correct / total) * 100).toFixed(1);
+        
+        const quizContent = document.getElementById('quizContent');
+        const summary = document.createElement('div');
+        summary.className = 'results-summary';
+        summary.innerHTML = `
+            <h2>Quiz Results</h2>
+            <div class="score-display">${correct} / ${total}</div>
+            <div class="percentage">${percentage}%</div>
+            <p class="results-message">
+                ${percentage >= 80 ? 'Excellent work! You have mastered this material!' : 
+                  percentage >= 60 ? 'Good job! Review the explanations to improve further.' : 
+                  'Keep studying! Check the explanations below for better understanding.'}
+            </p>
+        `;
+        quizContent.insertBefore(summary, quizContent.firstChild);
+        summary.scrollIntoView({ behavior: 'smooth' });
+        
+        document.getElementById('submitBtn').style.display = 'none';
+        document.querySelectorAll('.explanation').forEach(exp => exp.classList.add('visible'));
+        
+        quizSubmitted = true;
+        showChatbot();
+    }
+}
+
+// ===== CHATBOT FUNCTIONALITY =====
+function showChatbot() {
+    const existingChatbot = document.getElementById('chatbotContainer');
+    if (existingChatbot) {
+        existingChatbot.style.display = 'flex';
+    } else {
+        createChatbot();
+    }
+}
+
+function createChatbot() {
+    const chatbotHTML = `
+        <div id="chatbotContainer" class="chatbot-container">
+            <div class="chatbot-header">
+                <h3>💬 Study Assistant</h3>
+                <button onclick="toggleChatbot()" class="chatbot-close">−</button>
+            </div>
+            <div id="chatbotMessages" class="chatbot-messages">
+                <div class="bot-message">
+                    Hi! I'm your study assistant. Ask me about any questions you got wrong or need clarification on!
+                </div>
+            </div>
+            <div class="chatbot-input-area">
+                <input type="text" id="chatbotInput" placeholder="Ask about a question..." onkeypress="if(event.key==='Enter') sendChatMessage()">
+                <button onclick="sendChatMessage()" class="btn-send">Send</button>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('quizPage').insertAdjacentHTML('beforeend', chatbotHTML);
+}
+
+async function sendChatMessage() {
+    const input = document.getElementById('chatbotInput');
+    const message = input.value.trim();
+    
+    if (!message) return;
+    
+    addChatMessage(message, 'user');
+    input.value = '';
+    
+    addChatMessage('Thinking...', 'bot-thinking');
+    
+    try {
+        const response = await fetch(`${API_URL}/chatbot`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${userToken}`
+            },
+            body: JSON.stringify({
+                message: message,
+                questions: currentQuestions
+            })
+        });
+        
+        const data = await response.json();
+        
+        // Remove thinking message
+        const thinkingMsg = document.querySelector('.bot-thinking');
+        if (thinkingMsg) thinkingMsg.remove();
+        
+        if (data.success) {
+            addChatMessage(data.response, 'bot');
+        } else {
+            addChatMessage('Sorry, I encountered an error. Please try again.', 'bot');
+        }
+    } catch (error) {
+        const thinkingMsg = document.querySelector('.bot-thinking');
+        if (thinkingMsg) thinkingMsg.remove();
+        addChatMessage('Sorry, I could not process your request.', 'bot');
+    }
+}
+
+function addChatMessage(message, sender) {
+    const messagesDiv = document.getElementById('chatbotMessages');
+    const messageDiv = document.createElement('div');
+    messageDiv.className = sender === 'user' ? 'user-message' : sender === 'bot-thinking' ? 'bot-message bot-thinking' : 'bot-message';
+    messageDiv.textContent = message;
+    messagesDiv.appendChild(messageDiv);
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+}
+
+function toggleChatbot() {
+    const chatbot = document.getElementById('chatbotContainer');
+    if (chatbot.classList.contains('minimized')) {
+        chatbot.classList.remove('minimized');
+    } else {
+        chatbot.classList.add('minimized');
+    }
+}
+
+// ===== FLASHCARD FUNCTIONS =====
 function displayFlashcards(text) {
     const lines = text.split('\n').filter(line => line.trim());
     currentQuestions = [];
@@ -1216,6 +1391,7 @@ function nextCard() {
     }
 }
 
+// ===== MATCHING TYPE =====
 function displayMatchingType(text) {
     const lines = text.split('\n').filter(line => line.trim());
     let column1 = [];
@@ -1316,82 +1492,7 @@ function selectOption(element, questionNum) {
     element.classList.add('selected');
 }
 
-function submitQuiz() {
-    const questions = document.querySelectorAll('.question-card');
-    let correct = 0;
-    let total = 0;
-    
-    questions.forEach((question, idx) => {
-        total++;
-        
-        const textInput = question.querySelector('input[type="text"]');
-        if (textInput) {
-            const userAnswer = textInput.value.trim().toLowerCase();
-            const correctAnswer = currentQuestions[idx]?.answer?.toLowerCase() || '';
-            const isCorrect = userAnswer === correctAnswer;
-            
-            textInput.style.borderColor = isCorrect ? 'var(--success)' : 'var(--error)';
-            textInput.disabled = true;
-            
-            if (isCorrect) correct++;
-        }
-        
-        const textArea = question.querySelector('textarea');
-        if (textArea) {
-            const userAnswers = textArea.value.trim().toLowerCase().split(',').map(a => a.trim()).sort();
-            const correctAnswers = (currentQuestions[idx]?.answer || '').toLowerCase().split(',').map(a => a.trim()).sort();
-            
-            const isCorrect = userAnswers.length === correctAnswers.length && 
-                              userAnswers.every((ans, i) => ans === correctAnswers[i]);
-            
-            textArea.style.borderColor = isCorrect ? 'var(--success)' : 'var(--error)';
-            textArea.disabled = true;
-            
-            if (isCorrect) correct++;
-        }
-        
-        const selectedOption = question.querySelector('.option.selected');
-        if (selectedOption) {
-            const userAnswer = selectedOption.textContent.trim();
-            const correctAnswer = currentQuestions[idx]?.correctAnswer || currentQuestions[idx]?.answer || '';
-            const isCorrect = userAnswer.charAt(0) === correctAnswer.charAt(0) || userAnswer === correctAnswer;
-            
-            if (isCorrect) {
-                selectedOption.classList.add('correct');
-                correct++;
-            } else {
-                selectedOption.classList.add('incorrect');
-            }
-        }
-    });
-    
-    if (total > 0) {
-        const percentage = ((correct / total) * 100).toFixed(1);
-        
-        const quizContent = document.getElementById('quizContent');
-        const summary = document.createElement('div');
-        summary.className = 'results-summary';
-        summary.innerHTML = `
-            <h2>Quiz Results</h2>
-            <div class="score-display">${correct} / ${total}</div>
-            <div class="percentage">${percentage}%</div>
-            <p class="results-message">
-                ${percentage >= 80 ? 'Excellent work! You have mastered this material!' : 
-                  percentage >= 60 ? 'Good job! Review the explanations to improve further.' : 
-                  'Keep studying! Check the explanations below for better understanding.'}
-            </p>
-        `;
-        quizContent.insertBefore(summary, quizContent.firstChild);
-        summary.scrollIntoView({ behavior: 'smooth' });
-        
-        document.getElementById('submitBtn').style.display = 'none';
-        
-        document.querySelectorAll('.explanation').forEach(exp => {
-            exp.classList.add('visible');
-        });
-    }
-}
-
+// ===== DELETE FUNCTIONS =====
 async function deleteReviewer(reviewerId) {
     if (!confirm('Are you sure you want to delete this study material?')) {
         return;
@@ -1423,4 +1524,11 @@ function exitQuiz() {
     document.querySelector('[data-page="materials"]').click();
     document.getElementById('submitBtn').style.display = 'block';
     currentReviewerId = null;
+    quizSubmitted = false;
+    
+    // bye chatbot
+    const chatbot = document.getElementById('chatbotContainer');
+    if (chatbot) {
+        chatbot.remove();
+    }
 }

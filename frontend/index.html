@@ -367,7 +367,8 @@ Answer: B
 
             <div class="modal-body">
                 <div class="form-group">
-                    <label>Select Quiz Type</label>
+                    <label>Select Quiz Types (Multi-select)</label>
+                    <p class="helper-text">Click multiple types to create a mixed quiz</p>
                     <div class="quiz-types">
                         <button type="button" class="quiz-type-btn" data-type="identification">
                             <span class="type-icon">📝</span>
@@ -378,12 +379,16 @@ Answer: B
                             <span>Multiple Choice</span>
                         </button>
                         <button type="button" class="quiz-type-btn" data-type="true-false">
-                            <span class="type-icon">✓</span>
+                            <span class="type-icon">✔</span>
                             <span>True or False</span>
                         </button>
                         <button type="button" class="quiz-type-btn" data-type="association">
                             <span class="type-icon">🔗</span>
                             <span>Association</span>
+                        </button>
+                        <button type="button" class="quiz-type-btn" data-type="enumeration">
+                            <span class="type-icon">📋</span>
+                            <span>Enumeration</span>
                         </button>
                         <button type="button" class="quiz-type-btn" data-type="matching">
                             <span class="type-icon">🔀</span>
@@ -406,13 +411,22 @@ Answer: B
                     <select id="modalAssociationType" class="form-control">
                         <option value="except">EXCEPT Questions (All are X except...)</option>
                         <option value="odd-one-out">Odd One Out (Which does NOT belong?)</option>
-                        <option value="mix">Mix of Both</option>
+                        <option value="conditional">Conditional Statements (If statement 1/2 is true)</option>
+                        <option value="mix">Mix of All Types</option>
                     </select>
+                    <small class="helper-text">
+                        <strong>Conditional format:</strong><br>
+                        A) If statement 1 is true<br>
+                        B) If statement 2 is true<br>
+                        C) If both are true<br>
+                        D) If neither is true
+                    </small>
                 </div>
 
                 <div class="form-group">
                     <label>Special Instructions (Optional)</label>
-                    <textarea id="specialInstructions" class="form-control" rows="3" placeholder="e.g., Focus on definitions, include calculations, make it challenging..."></textarea>
+                    <textarea id="specialInstructions" class="form-control" rows="3" placeholder="e.g., Focus on definitions, include calculations, make it challenging, use specific topics..."></textarea>
+                    <small class="helper-text">AI will generate questions based on your study material and these instructions</small>
                 </div>
             </div>
 
