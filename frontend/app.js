@@ -943,12 +943,34 @@ async function deleteImportedQuizFromDatabase(quizId) {
 function toggleQuizType(button) {
     const type = button.getAttribute('data-type');
     
-    if (button.classList.contains('selected')) {
-        button.classList.remove('selected');
-        selectedQuizTypes = selectedQuizTypes.filter(t => t !== type);
-    } else {
+    // If flashcard is clicked
+    if (type === 'flashcard') {
+        // Deselect all others
+        document.querySelectorAll('.quiz-type-btn').forEach(btn => {
+            btn.classList.remove('selected');
+        });
+        // Select only flashcard
+        button.classList.add('selected');
+        selectedQuizTypes = ['flashcard'];
+    }
+    // If flashcard is already selected and user clicks another type
+    else if (selectedQuizTypes.includes('flashcard')) {
+        // Remove flashcard
+        selectedQuizTypes = selectedQuizTypes.filter(t => t !== 'flashcard');
+        document.querySelector('.quiz-type-btn[data-type="flashcard"]').classList.remove('selected');
+        // Add the new type
         button.classList.add('selected');
         selectedQuizTypes.push(type);
+    }
+    // Normal toggle behavior
+    else {
+        if (button.classList.contains('selected')) {
+            button.classList.remove('selected');
+            selectedQuizTypes = selectedQuizTypes.filter(t => t !== type);
+        } else {
+            button.classList.add('selected');
+            selectedQuizTypes.push(type);
+        }
     }
     
     // Update counter
@@ -957,7 +979,6 @@ function toggleQuizType(button) {
     
     // Show/hide True/False dropdown
     const modalTrueFalseGroup = document.getElementById('modalTrueFalseGroup');
-    
     if (selectedQuizTypes.includes('true-false')) {
         modalTrueFalseGroup.style.display = 'block';
     } else {
@@ -1244,21 +1265,22 @@ async function generateWithSettings() {
 }
 
 // ===== DISPLAY QUESTIONS (MIXED TYPES) =====
-// ===== DISPLAY QUESTIONS (MIXED TYPES) - FIXED =====
 function displayQuestions(questionsText, questionTypes) {
+    console.log('=== GENERATED TEXT START ===');
+    console.log(questionsText);
+    console.log('=== GENERATED TEXT END ===');
+    console.log('Question Types:', questionTypes);
+    
     const quizContent = document.getElementById('quizContent');
     currentQuestions = [];
     
-    // Handle special types first
+    // Handle flashcards separately (exclusive)
     if (questionTypes.includes('flashcard')) {
         displayFlashcards(questionsText);
         document.getElementById('submitBtn').style.display = 'none';
         return;
-    } else if (questionTypes.includes('matching')) {
-        displayMatchingType(questionsText);
-        return;
     }
-    
+
     const lines = questionsText.split('\n').filter(line => line.trim());
     let html = '';
     let questionNum = 1;
@@ -1267,24 +1289,120 @@ function displayQuestions(questionsText, questionTypes) {
     while (i < lines.length) {
         const line = lines[i];
         
-        // === MULTIPLE CHOICE or ASSOCIATION ===
-        // Must have: Q:, options (A), B), C), D)), and Answer:/Correct:
-        if (line.startsWith('Q:')) {
-            const question = line.substring(2).trim();
-            let options = [];
+        // ==========================================
+        // PRIORITY 1: CASE STUDY (before Q: catches it)
+        // ==========================================
+        if (line.startsWith('Case:')) {
+            const caseText = line.substring(5).trim();
+            const nextLine = lines[i + 1];
+            
+            if (nextLine && nextLine.startsWith('Q:')) {
+                const question = nextLine.substring(2).trim();
+                let options = [];
+                let correctAnswer = '';
+                let answerLineIndex = -1;
+                
+                // Check if it has options (multiple choice format that needs conversion)
+                for (let j = i + 2; j < Math.min(i + 10, lines.length); j++) {
+                    const checkLine = lines[j].trim();
+                    
+                    if (checkLine.match(/^[A-D]\)/)) {
+                        options.push(checkLine);
+                    } else if (checkLine.startsWith('Correct:') || checkLine.startsWith('Answer:')) {
+                        correctAnswer = checkLine.split(':')[1].trim();
+                        answerLineIndex = j;
+                        break;
+                    }
+                }
+                
+                // Convert multiple choice case study to text answer format
+                if (options.length >= 4 && correctAnswer && answerLineIndex !== -1) {
+                    const correctLetter = correctAnswer.charAt(0);
+                    const correctOption = options.find(opt => opt.startsWith(correctLetter));
+                    const modelAnswer = correctOption ? correctOption.substring(3).trim() : correctAnswer;
+                    
+                    currentQuestions.push({
+                        case: caseText,
+                        question,
+                        answer: modelAnswer,
+                        type: 'case-study'
+                    });
+                    
+                    html += `
+                        <div class="question-card case-study-card">
+                            <span class="question-number">Case Study ${questionNum}</span>
+                            <div class="case-scenario">
+                                <strong>Scenario:</strong>
+                                <p>${caseText}</p>
+                            </div>
+                            <div class="question-text">${question}</div>
+                            <textarea class="form-control case-answer" id="answer-${questionNum}" rows="4" placeholder="Type your answer based on the scenario..."></textarea>
+                            <small style="color: var(--text-muted); margin-top: 8px; display: block;">Provide a thoughtful response. AI will evaluate your answer.</small>
+                            <div class="explanation" id="explain-${questionNum}">
+                                <strong>Model Answer:</strong> ${modelAnswer}
+                            </div>
+                        </div>
+                    `;
+                    questionNum++;
+                    i = answerLineIndex + 1;
+                    continue;
+                }
+            }
+            i++;
+        }
+        // CASE STUDY: New format with "Scenario:"
+        else if (line.startsWith('Scenario:')) {
+            const scenario = line.substring(9).trim();
+            const questionLine = lines[i + 1];
+            const answerLine = lines[i + 2];
+            
+            if (questionLine && questionLine.startsWith('Question:') && answerLine && answerLine.startsWith('ModelAnswer:')) {
+                const question = questionLine.substring(9).trim();
+                const answer = answerLine.substring(12).trim();
+                
+                currentQuestions.push({
+                    case: scenario,
+                    question,
+                    answer,
+                    type: 'case-study'
+                });
+                
+                html += `
+                    <div class="question-card case-study-card">
+                        <span class="question-number">Case Study ${questionNum}</span>
+                        <div class="case-scenario">
+                            <strong>Scenario:</strong>
+                            <p>${scenario}</p>
+                        </div>
+                        <div class="question-text">${question}</div>
+                        <textarea class="form-control case-answer" id="answer-${questionNum}" rows="4" placeholder="Type your answer based on the scenario..."></textarea>
+                        <small style="color: var(--text-muted); margin-top: 8px; display: block;">Provide a thoughtful response. AI will evaluate your answer.</small>
+                        <div class="explanation" id="explain-${questionNum}">
+                            <strong>Model Answer:</strong> ${answer}
+                        </div>
+                    </div>
+                `;
+                questionNum++;
+                i += 3;
+                continue;
+            }
+            i++;
+        }
+        
+        // ==========================================
+        // PRIORITY 2: ASSOCIATION (before Q: catches it)
+        // ==========================================
+        // Format: Q: [statement] \n a. [item] \n b. [item]
+        else if (line.startsWith('Q:') && lines[i + 1]?.startsWith('a.') && lines[i + 2]?.startsWith('b.')) {
+            const statement = line.substring(2).trim();
+            const itemA = lines[i + 1].substring(2).trim();
+            const itemB = lines[i + 2].substring(2).trim();
             let correctAnswer = '';
             let answerLineIndex = -1;
             
-            // Look for options and answer
-            for (let j = i + 1; j < Math.min(i + 8, lines.length); j++) {
+            // Look for the answer
+            for (let j = i + 3; j < Math.min(i + 10, lines.length); j++) {
                 const nextLine = lines[j].trim();
-                
-                // Check if it's an option line
-                if (nextLine.match(/^[A-D]\)/)) {
-                    options.push(nextLine);
-                }
-                
-                // Check if it's the answer line
                 if (nextLine.startsWith('Correct:') || nextLine.startsWith('Answer:')) {
                     correctAnswer = nextLine.split(':')[1].trim();
                     answerLineIndex = j;
@@ -1292,19 +1410,35 @@ function displayQuestions(questionsText, questionTypes) {
                 }
             }
             
-            // If we have 4 options AND an answer, it's multiple choice/association
-            if (options.length === 4 && correctAnswer && answerLineIndex !== -1) {
+            if (correctAnswer && answerLineIndex !== -1) {
+                // Standard association options (converting a/b to I/II)
+                const options = [
+                    'A) If "I" is associated with the statement',
+                    'B) If "II" is associated with the statement',
+                    'C) If both are associated with the statement',
+                    'D) Neither are associated with the statement'
+                ];
+                
+                const fullQuestion = `${statement}\nI. ${itemA}\nII. ${itemB}`;
+                
                 currentQuestions.push({ 
-                    question, 
+                    question: fullQuestion,
                     options, 
                     correctAnswer, 
-                    type: 'multiple-choice' 
+                    type: 'association' 
                 });
                 
                 html += `
-                    <div class="question-card">
-                        <span class="question-number">Question ${questionNum}</span>
-                        <div class="question-text">${question}</div>
+                    <div class="question-card association-card">
+                        <span class="question-number">Association ${questionNum}</span>
+                        <div class="association-statement">
+                            <strong>Statement:</strong> ${statement}
+                        </div>
+                        <div class="association-items">
+                            <div class="association-item"><strong>I.</strong> ${itemA}</div>
+                            <div class="association-item"><strong>II.</strong> ${itemB}</div>
+                        </div>
+                        <div class="question-text" style="font-size: 15px; margin-top: 16px; margin-bottom: 12px;">Which option is correct?</div>
                         ${options.map(opt => `
                             <div class="option" onclick="selectOption(this, ${questionNum})">${opt}</div>
                         `).join('')}
@@ -1314,51 +1448,89 @@ function displayQuestions(questionsText, questionTypes) {
                     </div>
                 `;
                 questionNum++;
-                i = answerLineIndex + 1; // Skip to after the answer
+                i = answerLineIndex + 1;
                 continue;
             }
+            i++;
+        }
+        // ASSOCIATION: New format with "Statement:" and Roman numerals
+        else if (line.startsWith('Statement:') && !lines[i + 1]?.startsWith('Answer:')) {
+            const statement = line.substring(10).trim();
+            let item1 = '';
+            let item2 = '';
+            let options = [];
+            let correctAnswer = '';
+            let answerLineIndex = -1;
             
-            // === IDENTIFICATION ===
-            // Q: followed by A: with NO options in between
-            const nextLine = lines[i + 1];
-            if (nextLine && nextLine.startsWith('A:')) {
-                const answer = nextLine.substring(2).trim();
+            // Look for items and options
+            for (let j = i + 1; j < Math.min(i + 10, lines.length); j++) {
+                const nextLine = lines[j].trim();
+                
+                if (nextLine.startsWith('I.')) {
+                    item1 = nextLine.substring(2).trim();
+                } else if (nextLine.startsWith('II.')) {
+                    item2 = nextLine.substring(3).trim();
+                } else if (nextLine.match(/^[A-D]\)/)) {
+                    options.push(nextLine);
+                } else if (nextLine.startsWith('Correct:') || nextLine.startsWith('Answer:')) {
+                    correctAnswer = nextLine.split(':')[1].trim();
+                    answerLineIndex = j;
+                    break;
+                }
+            }
+            
+            // If we have all components, it's association
+            if (item1 && item2 && options.length === 4 && correctAnswer && answerLineIndex !== -1) {
+                const fullQuestion = `${statement}\nI. ${item1}\nII. ${item2}`;
                 
                 currentQuestions.push({ 
-                    question, 
-                    answer, 
-                    type: 'identification' 
+                    question: fullQuestion,
+                    options, 
+                    correctAnswer, 
+                    type: 'association' 
                 });
                 
                 html += `
-                    <div class="question-card">
-                        <span class="question-number">Question ${questionNum}</span>
-                        <div class="question-text">${question}</div>
-                        <input type="text" class="form-control" id="answer-${questionNum}" placeholder="Type your answer here">
+                    <div class="question-card association-card">
+                        <span class="question-number">Association ${questionNum}</span>
+                        <div class="association-statement">
+                            <strong>Statement:</strong> ${statement}
+                        </div>
+                        <div class="association-items">
+                            <div class="association-item"><strong>I.</strong> ${item1}</div>
+                            <div class="association-item"><strong>II.</strong> ${item2}</div>
+                        </div>
+                        <div class="question-text" style="font-size: 15px; margin-top: 16px; margin-bottom: 12px;">Which option is correct?</div>
+                        ${options.map(opt => `
+                            <div class="option" onclick="selectOption(this, ${questionNum})">${opt}</div>
+                        `).join('')}
                         <div class="explanation" id="explain-${questionNum}">
-                            <strong>Correct Answer:</strong> ${answer}
+                            <strong>Correct Answer:</strong> ${correctAnswer}
                         </div>
                     </div>
                 `;
                 questionNum++;
-                i += 2; // Skip Q and A lines
+                i = answerLineIndex + 1;
                 continue;
             }
-            
-            // If we got here, skip this line (malformed question)
             i++;
         }
-        // === TRUE/FALSE ===
+        
+        // ==========================================
+        // PRIORITY 3: TRUE/FALSE
+        // ==========================================
         else if (line.startsWith('Statement:')) {
             const statement = line.substring(10).trim();
-            const answer = lines[i + 1] && lines[i + 1].startsWith('Answer:') 
-                ? lines[i + 1].substring(7).trim() 
-                : '';
-            const explanation = lines[i + 2] && lines[i + 2].startsWith('Explanation:') 
-                ? lines[i + 2].substring(12).trim() 
-                : '';
+            const answerLine = lines[i + 1];
+            const explanationLine = lines[i + 2];
             
-            if (answer) {
+            // Check if it's True/False (has Answer: immediately after Statement:)
+            if (answerLine && answerLine.startsWith('Answer:')) {
+                const answer = answerLine.substring(7).trim();
+                const explanation = explanationLine && explanationLine.startsWith('Explanation:') 
+                    ? explanationLine.substring(12).trim() 
+                    : '';
+                
                 currentQuestions.push({ 
                     statement, 
                     answer, 
@@ -1379,13 +1551,73 @@ function displayQuestions(questionsText, questionTypes) {
                     </div>
                 `;
                 questionNum++;
-                i += 3;
+                i += explanation ? 3 : 2;
                 continue;
             }
             i++;
         }
-        // === ENUMERATION ===
-        else if (line.match(/^Q:.*list|name|enumerate|states/i) && lines[i + 1]?.startsWith('A:')) {
+        
+        // ==========================================
+        // PRIORITY 4: MATCHING TYPE
+        // ==========================================
+        else if (line.startsWith('Column A |')) {
+            let pairs = [];
+            let j = i + 1;
+            
+            // Collect all matching pairs
+            while (j < lines.length && lines[j].includes('|')) {
+                const parts = lines[j].split('|').map(p => p.trim());
+                if (parts.length === 2 && !parts[0].includes('Column')) {
+                    pairs.push({ left: parts[0], right: parts[1] });
+                    j++;
+                } else {
+                    break;
+                }
+            }
+            
+            if (pairs.length > 0) {
+                currentQuestions.push({
+                    type: 'matching',
+                    pairs: pairs
+                });
+                
+                const shuffledRight = [...pairs.map(p => p.right)].sort(() => Math.random() - 0.5);
+                
+                html += `
+                    <div class="question-card matching-card" data-question-num="${questionNum}" data-complete="false">
+                        <span class="question-number">Matching Type ${questionNum}</span>
+                        <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 16px;">Match items from Column A with their corresponding items in Column B</p>
+                        <div class="matching-container-inline">
+                            <div class="matching-column">
+                                <h4>Column A</h4>
+                                ${pairs.map((p, idx) => `
+                                    <div class="matching-item" data-col="1" data-idx="${idx}" onclick="selectMatching(this, ${questionNum})">
+                                        ${p.left}
+                                    </div>
+                                `).join('')}
+                            </div>
+                            <div class="matching-column">
+                                <h4>Column B</h4>
+                                ${shuffledRight.map((item) => `
+                                    <div class="matching-item" data-col="2" data-value="${item}" onclick="selectMatching(this, ${questionNum})">
+                                        ${item}
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                        <div class="matching-status" id="matching-status-${questionNum}">Matched 0 of ${pairs.length}</div>
+                    </div>
+                `;
+                questionNum++;
+                i = j;
+                continue;
+            }
+        }
+        
+        // ==========================================
+        // PRIORITY 5: ENUMERATION
+        // ==========================================
+        else if (line.match(/^Q:.*list|name|enumerate|states|identify|give/i) && lines[i + 1]?.startsWith('A:')) {
             const question = line.substring(2).trim();
             const answer = lines[i + 1].substring(2).trim();
             
@@ -1408,16 +1640,112 @@ function displayQuestions(questionsText, questionTypes) {
             `;
             questionNum++;
             i += 2;
+            continue;
         }
+        
+        // ==========================================
+        // PRIORITY 6: MULTIPLE CHOICE (runs after everything else)
+        // ==========================================
+        else if (line.startsWith('Q:')) {
+            const question = line.substring(2).trim();
+            let options = [];
+            let correctAnswer = '';
+            let answerLineIndex = -1;
+            
+            // Look for options and answer
+            for (let j = i + 1; j < Math.min(i + 8, lines.length); j++) {
+                const nextLine = lines[j].trim();
+                
+                if (nextLine.match(/^[A-D]\)/)) {
+                    options.push(nextLine);
+                }
+                
+                if (nextLine.startsWith('Correct:') || nextLine.startsWith('Answer:')) {
+                    correctAnswer = nextLine.split(':')[1].trim();
+                    answerLineIndex = j;
+                    break;
+                }
+            }
+            
+            // If we have 4 options AND an answer, it's multiple choice
+            if (options.length === 4 && correctAnswer && answerLineIndex !== -1) {
+                currentQuestions.push({ 
+                    question, 
+                    options, 
+                    correctAnswer, 
+                    type: 'multiple-choice' 
+                });
+                
+                html += `
+                    <div class="question-card">
+                        <span class="question-number">Question ${questionNum}</span>
+                        <div class="question-text">${question}</div>
+                        ${options.map(opt => `
+                            <div class="option" onclick="selectOption(this, ${questionNum})">${opt}</div>
+                        `).join('')}
+                        <div class="explanation" id="explain-${questionNum}">
+                            <strong>Correct Answer:</strong> ${correctAnswer}
+                        </div>
+                    </div>
+                `;
+                questionNum++;
+                i = answerLineIndex + 1;
+                continue;
+            }
+            
+            // === IDENTIFICATION (if no options found) ===
+            const nextLine = lines[i + 1];
+            if (nextLine && nextLine.startsWith('A:')) {
+                const answer = nextLine.substring(2).trim();
+                
+                currentQuestions.push({ 
+                    question, 
+                    answer, 
+                    type: 'identification' 
+                });
+                
+                html += `
+                    <div class="question-card">
+                        <span class="question-number">Question ${questionNum}</span>
+                        <div class="question-text">${question}</div>
+                        <input type="text" class="form-control" id="answer-${questionNum}" placeholder="Type your answer here">
+                        <div class="explanation" id="explain-${questionNum}">
+                            <strong>Correct Answer:</strong> ${answer}
+                        </div>
+                    </div>
+                `;
+                questionNum++;
+                i += 2;
+                continue;
+            }
+            
+            i++;
+        }
+        
         else {
             i++;
         }
     }
     
+    // Log unparsed lines for debugging
+    if (questionNum === 1) {
+        console.warn('⚠️ No questions were parsed! Check the AI response format.');
+    }
+    
     if (html) {
         quizContent.innerHTML = html;
     } else {
-        quizContent.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 40px;">No questions could be parsed from the generated text.</p>';
+        quizContent.innerHTML = `
+            <div style="text-align: center; padding: 40px;">
+                <p style="color: var(--error); font-size: 18px; margin-bottom: 20px;">
+                    ⚠️ Could not parse questions from AI response
+                </p>
+                <p style="color: var(--text-muted); margin-bottom: 20px;">
+                    The AI generated text in an unexpected format. Try regenerating the quiz.
+                </p>
+                <button class="btn-primary" onclick="exitQuiz()">Go Back</button>
+            </div>
+        `;
     }
 }
 
@@ -1451,7 +1779,7 @@ async function checkAnswerWithAI(userAnswer, correctAnswer, questionText) {
     }
 }
 
-// ===== SUBMIT QUIZ WITH AI CHECKING =====
+// ===== AI CHECKING =====
 async function submitQuiz() {
     const questions = document.querySelectorAll('.question-card');
     let correct = 0;
@@ -1461,6 +1789,25 @@ async function submitQuiz() {
     
     for (const [idx, question] of Array.from(questions).entries()) {
         total++;
+
+        // Check if its matching question
+        if (question.classList.contains('matching-card')) {
+            const isComplete = question.dataset.complete === 'true';
+            if (isComplete) {
+                correct++;
+                question.style.borderColor = 'var(--success)';
+            } else {
+                question.style.borderColor = 'var(--error)';
+            }
+            
+            // Disable all matching items
+            question.querySelectorAll('.matching-item').forEach(item => {
+                item.style.pointerEvents = 'none';
+                item.style.opacity = '0.7';
+            });
+            
+            continue; 
+        }
         
         // Text input (identification)
         const textInput = question.querySelector('input[type="text"]');
@@ -1477,13 +1824,15 @@ async function submitQuiz() {
             if (isCorrect) correct++;
         }
         
-        // Textarea (enumeration)
+        // Textarea (enumeration or case study)
         const textArea = question.querySelector('textarea');
         if (textArea) {
             const userAnswer = textArea.value.trim();
             const correctAnswer = currentQuestions[idx]?.answer || '';
             const questionText = currentQuestions[idx]?.question || '';
+            const isCaseStudy = currentQuestions[idx]?.type === 'case-study';
             
+            // Use AI checking for both
             const isCorrect = await checkAnswerWithAI(userAnswer, correctAnswer, questionText);
             
             textArea.style.borderColor = isCorrect ? 'var(--success)' : 'var(--error)';
@@ -1789,97 +2138,75 @@ function nextCard() {
     }
 }
 
-// ===== MATCHING TYPE =====
-function displayMatchingType(text) {
-    const lines = text.split('\n').filter(line => line.trim());
-    let column1 = [];
-    let column2 = [];
-    
-    for (let i = 0; i < lines.length; i++) {
-        if (lines[i].includes('|')) {
-            const parts = lines[i].split('|').map(p => p.trim());
-            if (parts.length === 2 && !parts[0].includes('Column')) {
-                column1.push(parts[0]);
-                column2.push(parts[1]);
-            }
-        }
-    }
-    
-    const shuffled = [...column2].sort(() => Math.random() - 0.5);
-    
-    currentQuestions = column1.map((item, idx) => ({
-        left: item,
-        right: column2[idx],
-        type: 'matching'
-    }));
-    
-    matchedPairs = [];
-    matchingSelections = { column1: null, column2: null };
-    
-    const html = `
-        <div class="matching-container">
-            <div class="matching-column">
-                <h3>Column A</h3>
-                ${column1.map((item, idx) => `
-                    <div class="matching-item" data-col="1" data-idx="${idx}" onclick="selectMatching(this)">
-                        ${item}
-                    </div>
-                `).join('')}
-            </div>
-            <div class="matching-column">
-                <h3>Column B</h3>
-                ${shuffled.map((item, idx) => `
-                    <div class="matching-item" data-col="2" data-value="${item}" onclick="selectMatching(this)">
-                        ${item}
-                    </div>
-                `).join('')}
-            </div>
-        </div>
-    `;
-    
-    document.getElementById('quizContent').innerHTML = html;
-}
-
-function selectMatching(element) {
+function selectMatching(element, questionNum) {
     const col = element.dataset.col;
+    const card = element.closest('.matching-card');
     
     if (element.classList.contains('matched')) return;
     
-    if (col === '1') {
-        document.querySelectorAll('.matching-item[data-col="1"]').forEach(el => el.classList.remove('selected'));
-        element.classList.add('selected');
-        matchingSelections.column1 = element;
-    } else {
-        document.querySelectorAll('.matching-item[data-col="2"]').forEach(el => el.classList.remove('selected'));
-        element.classList.add('selected');
-        matchingSelections.column2 = element;
+    // Get or initialize selections for this specific matching question
+    if (!window.matchingSelections) {
+        window.matchingSelections = {};
+    }
+    if (!window.matchingSelections[questionNum]) {
+        window.matchingSelections[questionNum] = { 
+            column1: null, 
+            column2: null,
+            matchedPairs: 0,
+            totalPairs: card.querySelectorAll('.matching-item[data-col="1"]').length
+        };
     }
     
-    if (matchingSelections.column1 && matchingSelections.column2) {
-        const idx = parseInt(matchingSelections.column1.dataset.idx);
-        const selectedValue = matchingSelections.column2.dataset.value;
-        const correctValue = currentQuestions[idx].right;
+    const selections = window.matchingSelections[questionNum];
+    
+    if (col === '1') {
+        card.querySelectorAll('.matching-item[data-col="1"]').forEach(el => el.classList.remove('selected'));
+        element.classList.add('selected');
+        selections.column1 = element;
+    } else {
+        card.querySelectorAll('.matching-item[data-col="2"]').forEach(el => el.classList.remove('selected'));
+        element.classList.add('selected');
+        selections.column2 = element;
+    }
+    
+    // Check if both selections are made
+    if (selections.column1 && selections.column2) {
+        const idx = parseInt(selections.column1.dataset.idx);
+        const selectedValue = selections.column2.dataset.value;
         
-        if (selectedValue === correctValue) {
-            matchingSelections.column1.classList.add('matched');
-            matchingSelections.column2.classList.add('matched');
-            matchingSelections.column1.classList.remove('selected');
-            matchingSelections.column2.classList.remove('selected');
-            matchedPairs.push({ left: idx, right: selectedValue });
-            showAlert('Correct match!', 'success');
-        } else {
-            showAlert('Incorrect match. Try again!', 'error');
-            matchingSelections.column1.classList.remove('selected');
-            matchingSelections.column2.classList.remove('selected');
-        }
+        // Find the matching question data
+        const matchingQuestion = currentQuestions.find(q => q.type === 'matching');
         
-        matchingSelections = { column1: null, column2: null };
-        
-        if (matchedPairs.length === currentQuestions.length) {
-            setTimeout(() => {
-                showAlert('All pairs matched correctly! Great job!', 'success');
-                document.getElementById('submitBtn').style.display = 'none';
-            }, 500);
+        if (matchingQuestion && matchingQuestion.pairs && matchingQuestion.pairs[idx]) {
+            const correctValue = matchingQuestion.pairs[idx].right;
+            
+            if (selectedValue === correctValue) {
+                selections.column1.classList.add('matched');
+                selections.column2.classList.add('matched');
+                selections.column1.classList.remove('selected');
+                selections.column2.classList.remove('selected');
+                selections.matchedPairs++;
+                
+                const statusDiv = document.getElementById(`matching-status-${questionNum}`);
+                if (statusDiv) {
+                    statusDiv.textContent = `Matched ${selections.matchedPairs} of ${selections.totalPairs}`;
+                    statusDiv.style.color = 'var(--success)';
+                }
+                
+                if (selections.matchedPairs === selections.totalPairs) {
+                    card.dataset.complete = 'true';
+                    showAlert('All pairs matched correctly!', 'success');
+                }
+                
+                showAlert('Correct match!', 'success');
+            } else {
+                showAlert('Incorrect match. Try again!', 'error');
+                selections.column1.classList.remove('selected');
+                selections.column2.classList.remove('selected');
+            }
+            
+            selections.column1 = null;
+            selections.column2 = null;
         }
     }
 }

@@ -2023,7 +2023,114 @@ body.light-mode .timestamp {
 }
 
 
-    /* Responsive */
+/* ===== CASE STUDY STYLES ===== */
+.case-study-card {
+    background: linear-gradient(135deg, var(--card-bg), var(--navy));
+}
+
+.case-scenario {
+    background: var(--navy);
+    border-left: 4px solid var(--accent-blue);
+    padding: 16px 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.case-scenario strong {
+    color: var(--baby-blue);
+    display: block;
+    margin-bottom: 8px;
+}
+
+.case-scenario p {
+    color: var(--text-light);
+    line-height: 1.6;
+    margin: 0;
+}
+
+.case-answer {
+    min-height: 100px !important;
+}
+
+/* ===== ASSOCIATION STYLES ===== */
+.association-card {
+    background: linear-gradient(135deg, var(--card-bg), var(--navy));
+}
+
+.association-statement {
+    background: var(--navy);
+    border-left: 4px solid var(--yellow);
+    padding: 14px 18px;
+    border-radius: 8px;
+    margin-bottom: 16px;
+}
+
+.association-statement strong {
+    color: var(--yellow);
+    display: block;
+    margin-bottom: 6px;
+    font-size: 14px;
+}
+
+.association-items {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 16px;
+    padding: 14px 18px;
+    background: var(--navy);
+    border-radius: 8px;
+}
+
+.association-item {
+    color: var(--text-light);
+    font-size: 16px;
+    font-weight: 500;
+}
+
+.association-item strong {
+    color: var(--baby-blue);
+    margin-right: 8px;
+}
+
+/* ===== INLINE MATCHING STYLES ===== */
+.matching-card {
+    background: linear-gradient(135deg, var(--navy), var(--blue));
+}
+
+.matching-container-inline {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin: 20px 0;
+}
+
+.matching-container-inline h4 {
+    color: var(--baby-blue);
+    font-size: 14px;
+    margin-bottom: 12px;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.matching-status {
+    text-align: center;
+    color: var(--success);
+    font-weight: 600;
+    margin-top: 15px;
+}
+
+/* Mobile responsive for inline matching */
+@media (max-width: 768px) {
+    .matching-container-inline {
+        grid-template-columns: 1fr;
+        gap: 30px;
+    }
+}
+
+
+/* Responsive */
     @media (max-width: 768px) {
         .chat {
             height: 500px;

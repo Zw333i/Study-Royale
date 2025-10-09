@@ -49,7 +49,7 @@ function buildPrompt(text, questionTypes, count, specialInstructions, questionsD
 const typePrompts = {
         'fill-blank': `Create EXACTLY ${questionsForThisType} fill-in-the-blank questions (no more, no less).\nFormat each as:\nQ: [question with blank _____]\nA: [correct answer]`,
         
-        'identification': `Create EXACTLY ${questionsForThisType} identification questions (no more, no less).\nFormat each as:\nQ: [direct question]\nA: [correct answer]`,
+        'identification': `Create EXACTLY ${questionsForThisType} identification questions (no more, no less). Answers must be SHORT - single words or short phrases (1-3 words maximum), NOT full sentences.\nFormat each as:\nQ: [direct question]\nA: [short answer]`,
         
         'multiple-choice': `Create EXACTLY ${questionsForThisType} multiple choice questions (no more, no less) with 4 options each.\nFormat each as:\nQ: [question]\nA) [option]\nB) [option]\nC) [option]\nD) [option]\nCorrect: [A/B/C/D]`,
         
@@ -63,9 +63,60 @@ const typePrompts = {
         
         'matching': `Create EXACTLY ${questionsForThisType} matching pairs (no more, no less).\nFormat as:\nColumn A | Column B\n[term] | [definition]`,
         
-        'association': `Create EXACTLY ${questionsForThisType} real association questions (no more, no less).\nFormat each as:\nQ: [main concept]\na. [item a]\nb. [item b]\nA) Only a is associated\nB) Only b is associated\nC) Both are associated\nD) Neither is associated\nCorrect: [A/B/C/D]`,
+        'association': `Create EXACTLY ${questionsForThisType} association questions (no more, no less). 
+
+        ⚠️ CRITICAL FORMAT - USE ROMAN NUMERALS I and II:
+
+        Statement: [characteristic or description]
+        I. [first item]
+        II. [second item]
+        A) If "I" is associated with the statement
+        B) If "II" is associated with the statement
+        C) If both are associated with the statement
+        D) Neither are associated with the statement
+        Correct: [A/B/C/D]
+
+        CORRECT Example:
+        Statement: Simple topology with manual configuration
+        I. Static Routing
+        II. Dynamic Routing
+        A) If "I" is associated with the statement
+        B) If "II" is associated with the statement
+        C) If both are associated with the statement
+        D) Neither are associated with the statement
+        Correct: A
+
+        WRONG Example (DO NOT DO THIS):
+        Q: Static Routing
+        a. Simple topology
+        b. Scalable
+        A) Only a
+        B) Only b
+        Correct: A
+
+        YOU MUST USE "Statement:" "I." and "II." format with capital letters.`,
         
-        'case-study': `Create EXACTLY ${questionsForThisType} case study questions (no more, no less).\nFormat each as:\nCase: [scenario]\nQ: [question]\nA) [option]\nB) [option]\nC) [option]\nD) [option]\nCorrect: [A/B/C/D]`,
+        'case-study': `Create EXACTLY ${questionsForThisType} case study questions (no more, no less). 
+
+        ⚠️ CRITICAL FORMAT - DO NOT USE MULTIPLE CHOICE:
+
+        Scenario: [Write a detailed 2-4 sentence real-world situation or problem]
+        Question: [Ask what should be done or analyzed]
+        ModelAnswer: [Expected answer content]
+
+        CORRECT Example:
+        Scenario: A small business network has 5 computers that need to share files and a printer. The owner wants a simple, cost-effective solution that doesn't require a dedicated IT person to maintain.
+        Question: What network topology and equipment would you recommend for this business?
+        ModelAnswer: A star topology with a basic switch would be most suitable. This provides centralized management, easy troubleshooting, and allows all devices to communicate efficiently without complex configuration.
+
+        WRONG Example (DO NOT DO THIS):
+        Case: A network scenario
+        Q: What would you do?
+        A) Option 1
+        B) Option 2
+        Correct: A
+
+        YOU MUST USE "Scenario:" "Question:" and "ModelAnswer:" keywords.`,
         
         'odd-one-out': `Create EXACTLY ${questionsForThisType} "Odd One Out" questions (no more, no less).\nFormat each as:\nQ: Which is the odd one out?\nA) [item]\nB) [item]\nC) [item]\nD) [item]\nCorrect: [A/B/C/D]`,
         
