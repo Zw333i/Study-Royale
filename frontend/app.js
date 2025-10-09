@@ -980,7 +980,7 @@ async function startLearnMode() {
     const quizTitle = document.getElementById('quizTitle');
     const quizContent = document.getElementById('quizContent');
     
-    quizTitle.textContent = 'Learn Mode - Chat with AI';
+    quizTitle.textContent = 'Learn Mode';
     
     // Get reviewer data
     try {
