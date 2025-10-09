@@ -696,16 +696,85 @@ async function loadReviewers() {
         });
         const data = await response.json();
 
-        let materialsHTML = '';
-        
-        if (importedQuizzes.length > 0) {
-            materialsHTML += importedQuizzes.map(quiz => `
+        // Sort uploaded materials by exam date (earliest first)
+        let uploadedMaterials = [];
+        if (data.success && data.reviewers.length > 0) {
+            uploadedMaterials = data.reviewers.sort((a, b) => {
+                return new Date(a.examDate) - new Date(b.examDate);
+            });
+        }
+
+        // Sort imported quizzes by upload date (newest first)
+        let importedMaterials = [...importedQuizzes].sort((a, b) => {
+            return new Date(b.uploadDate) - new Date(a.uploadDate);
+        });
+
+        // Check if we have any materials
+        if (uploadedMaterials.length === 0 && importedMaterials.length === 0) {
+            listContainer.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-icon">📚</div>
+                    <h3>No Materials Yet</h3>
+                    <p>Upload your first study file or import a quiz to begin!</p>
+                </div>
+            `;
+            return;
+        }
+
+        // Helper function to check if exam date is within 7 days
+        const isExamUrgent = (examDate) => {
+            const today = new Date();
+            const exam = new Date(examDate);
+            const diffTime = exam - today;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            return diffDays <= 7 && diffDays >= 0;
+        };
+
+        // Build uploaded materials HTML
+        let uploadedHTML = '';
+        if (uploadedMaterials.length > 0) {
+            uploadedHTML = uploadedMaterials.map(reviewer => {
+                const isUrgent = isExamUrgent(reviewer.examDate);
+                return `
+                    <div class="material-card">
+                        <div class="material-header">
+                            <div class="material-icon">📄</div>
+                            <div class="material-info">
+                                <h3>${reviewer.fileName}</h3>
+                                <p>💾 ${(reviewer.fileSize / 1024).toFixed(2)} KB • ${reviewer.textLength} characters</p>
+                                <span class="exam-date-badge ${isUrgent ? 'urgent' : ''}">
+                                    📅 Exam: ${new Date(reviewer.examDate).toLocaleDateString()}
+                                    ${isUrgent ? ' • SOON!' : ''}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="material-actions">
+                            <button class="btn-start" onclick="startQuiz('${reviewer.id}')">Start Quiz</button>
+                            <button class="btn-delete" onclick="deleteReviewer('${reviewer.id}')">Delete</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        } else {
+            uploadedHTML = `
+                <div class="empty-state" style="padding: 40px 20px;">
+                    <div class="empty-icon" style="font-size: 48px; margin-bottom: 10px;">📄</div>
+                    <h3 style="font-size: 18px; margin-bottom: 5px;">No Uploaded Materials</h3>
+                    <p style="font-size: 14px; color: var(--text-muted);">Upload study files to generate AI quizzes</p>
+                </div>
+            `;
+        }
+
+        // Build imported quizzes HTML
+        let importedHTML = '';
+        if (importedMaterials.length > 0) {
+            importedHTML = importedMaterials.map(quiz => `
                 <div class="material-card">
                     <div class="material-header">
                         <div class="material-icon">📚</div>
                         <div class="material-info">
                             <h3>${quiz.title}</h3>
-                            <p>📝 Imported ${quiz.type.replace('-', ' ')} • ${quiz.questions.length} questions</p>
+                            <p>📝 ${quiz.type.replace('-', ' ').toUpperCase()} • ${quiz.questions.length} questions</p>
                         </div>
                     </div>
                     <div class="material-actions">
@@ -714,37 +783,41 @@ async function loadReviewers() {
                     </div>
                 </div>
             `).join('');
-        }
-        
-        if (data.success && data.reviewers.length > 0) {
-            materialsHTML += data.reviewers.map(reviewer => `
-                <div class="material-card">
-                    <div class="material-header">
-                        <div class="material-icon">📄</div>
-                        <div class="material-info">
-                            <h3>${reviewer.fileName}</h3>
-                            <p>📅 Exam: ${reviewer.examDate} • 💾 ${(reviewer.fileSize / 1024).toFixed(2)} KB</p>
-                        </div>
-                    </div>
-                    <div class="material-actions">
-                        <button class="btn-start" onclick="startQuiz('${reviewer.id}')">Start Quiz</button>
-                        <button class="btn-delete" onclick="deleteReviewer('${reviewer.id}')">Delete</button>
-                    </div>
-                </div>
-            `).join('');
-        }
-        
-        if (materialsHTML) {
-            listContainer.innerHTML = '<div class="materials-grid">' + materialsHTML + '</div>';
         } else {
-            listContainer.innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-icon">📚</div>
-                    <h3>No Materials Yet</h3>
-                    <p>Upload your first study file or import a quiz to begin!</p>
+            importedHTML = `
+                <div class="empty-state" style="padding: 40px 20px;">
+                    <div class="empty-icon" style="font-size: 48px; margin-bottom: 10px;">📚</div>
+                    <h3 style="font-size: 18px; margin-bottom: 5px;">No Imported Quizzes</h3>
+                    <p style="font-size: 14px; color: var(--text-muted);">Import pre-made quizzes to practice</p>
                 </div>
             `;
         }
+
+        // Combine into two-column layout
+        listContainer.innerHTML = `
+            <div class="materials-wrapper">
+                <div class="materials-column">
+                    <div class="materials-column-header">
+                        <div class="materials-column-icon">📄</div>
+                        <h2>Uploaded Materials <span style="color: var(--text-muted); font-weight: 400; font-size: 16px;">(${uploadedMaterials.length})</span></h2>
+                    </div>
+                    <div class="materials-grid">
+                        ${uploadedHTML}
+                    </div>
+                </div>
+                
+                <div class="materials-column">
+                    <div class="materials-column-header">
+                        <div class="materials-column-icon">📚</div>
+                        <h2>Imported Quizzes <span style="color: var(--text-muted); font-weight: 400; font-size: 16px;">(${importedMaterials.length})</span></h2>
+                    </div>
+                    <div class="materials-grid">
+                        ${importedHTML}
+                    </div>
+                </div>
+            </div>
+        `;
+
     } catch (error) {
         listContainer.innerHTML = '<div class="empty-state"><p style="color: var(--error);">Failed to load materials</p></div>';
         showAlert('Failed to load reviewers: ' + error.message, 'error');
