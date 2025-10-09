@@ -4,10 +4,10 @@ const router = express.Router();
 const { db } = require('../firebase');
 const { verifyToken } = require('./auth');
 
-// GET /api/reviewer - ADD verifyToken
+// GET ALL reviewers for user
 router.get('/', verifyToken, async (req, res) => {
   try {
-    const userId = req.user.uid; // Get from authenticated user
+    const userId = req.user.uid; 
 
     console.log('Fetching reviewers for userId:', userId);
 
@@ -43,6 +43,48 @@ router.get('/', verifyToken, async (req, res) => {
     res.status(500).json({ 
       error: error.message
     });
+  }
+});
+
+// GET SINGLE reviewer by ID
+router.get('/:reviewerId', verifyToken, async (req, res) => {
+  try {
+    const { reviewerId } = req.params;
+    const userId = req.user.uid;
+
+    console.log('Fetching single reviewer:', reviewerId, 'for user:', userId);
+
+    const reviewerDoc = await db.collection('reviewers').doc(reviewerId).get();
+    
+    if (!reviewerDoc.exists) {
+      console.log('Reviewer not found:', reviewerId);
+      return res.status(404).json({ error: 'Reviewer not found' });
+    }
+
+    const reviewerData = reviewerDoc.data();
+
+    if (reviewerData.userId !== userId) {
+      console.log('Unauthorized access attempt for reviewer:', reviewerId);
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    console.log('Successfully fetched reviewer:', reviewerId);
+
+    res.json({
+      success: true,
+      reviewer: {
+        id: reviewerDoc.id,
+        fileName: reviewerData.fileName,
+        uploadDate: reviewerData.uploadDate,
+        examDate: reviewerData.examDate,
+        fileSize: reviewerData.fileSize || 0,
+        textLength: reviewerData.textLength || 0
+      }
+    });
+
+  } catch (error) {
+    console.error('Get single reviewer error:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 

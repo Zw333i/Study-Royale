@@ -12,6 +12,7 @@ const deleteRoutes = require('./routes/delete');
 const reviewerRoutes = require('./routes/reviewer');
 const importedQuizRoutes = require('./routes/importedQuiz');
 const chatbotRoute = require('./routes/chatbot');
+const learnRoute = require('./routes/learn');
 
 const app = express();
 
@@ -25,12 +26,13 @@ app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/upload', uploadRoutes);
+app.use('/api/chatbot', chatbotRoute);
+app.use('/api/learn', learnRoute);
 app.use('/api/generate', generateRoutes);
-app.use('/api/delete', deleteRoutes);
 app.use('/api/reviewer', reviewerRoutes);
 app.use('/api/imported-quiz', importedQuizRoutes);
-app.use('/api/chatbot', chatbotRoute);
+app.use('/api/upload', uploadRoutes);
+app.use('/api/delete', deleteRoutes);
 
 app.get('/', (req, res) => {
   res.json({ message: 'Study Royale API is running!' });

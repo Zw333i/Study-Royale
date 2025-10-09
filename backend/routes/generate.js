@@ -8,8 +8,8 @@ const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY
 });
 
-async function generateQuestions(text, questionTypes, count = 10, specialInstructions = '', associationType = 'mix') {
-  const prompt = buildPrompt(text, questionTypes, count, specialInstructions, associationType);
+async function generateQuestions(text, questionTypes, count = 10, specialInstructions = '', questionsData = {}) {
+  const prompt = buildPrompt(text, questionTypes, count, specialInstructions, questionsData);
 
   try {
     const completion = await groq.chat.completions.create({
@@ -32,40 +32,48 @@ async function generateQuestions(text, questionTypes, count = 10, specialInstruc
   }
 }
 
-function buildPrompt(text, questionTypes, count, specialInstructions, associationType = 'mix') {
+function buildPrompt(text, questionTypes, count, specialInstructions, questionsData = {}) {
   const shortText = text.substring(0, 3000);
   
-  // Calculate questions per type
+  // Calculate questions per type - use floor to prevent exceeding count
   const typesArray = Array.isArray(questionTypes) ? questionTypes : [questionTypes];
-  const questionsPerType = Math.ceil(count / typesArray.length);
+  const questionsPerType = Math.floor(count / typesArray.length);
+  const remainder = count % typesArray.length;
   
   let prompts = [];
   
-  typesArray.forEach(type => {
-    const typePrompts = {
-      'identification': `Create ${questionsPerType} identification (fill-in-the-blank) questions.\nFormat each as:\nQ: [question with blank _____]\nA: [correct answer]`,
+  typesArray.forEach((type, index) => {
+    // Add 1 extra question to first types to handle remainder
+  const questionsForThisType = questionsPerType + (index < remainder ? 1 : 0);
+const typePrompts = {
+        'fill-blank': `Create EXACTLY ${questionsForThisType} fill-in-the-blank questions (no more, no less).\nFormat each as:\nQ: [question with blank _____]\nA: [correct answer]`,
+        
+        'identification': `Create EXACTLY ${questionsForThisType} identification questions (no more, no less).\nFormat each as:\nQ: [direct question]\nA: [correct answer]`,
+        
+        'multiple-choice': `Create EXACTLY ${questionsForThisType} multiple choice questions (no more, no less) with 4 options each.\nFormat each as:\nQ: [question]\nA) [option]\nB) [option]\nC) [option]\nD) [option]\nCorrect: [A/B/C/D]`,
+        
+        'true-false': questionsData.trueFalseVariant === 'conditional' 
+          ? `Create EXACTLY ${questionsForThisType} conditional true/false questions (no more, no less).\nFormat each as:\nStatement: If [statement 1] is true, then [statement 2] is:\nAnswer: [True/False/Cannot be determined]\nExplanation: [brief explanation]`
+          : `Create EXACTLY ${questionsForThisType} traditional true/false statements (no more, no less).\nFormat each as:\nStatement: [statement]\nAnswer: [True/False]\nExplanation: [brief explanation]`,
+        
+        'flashcard': `Create EXACTLY ${questionsForThisType} flashcards (no more, no less).\nFormat each as:\nFront: [term/question]\nBack: [definition/answer]`,
+        
+        'enumeration': `Create EXACTLY ${questionsForThisType} enumeration questions (no more, no less).\nFormat as:\nQ: [question asking to list items]\nA: 1. [item], 2. [item], 3. [item]`,
+        
+        'matching': `Create EXACTLY ${questionsForThisType} matching pairs (no more, no less).\nFormat as:\nColumn A | Column B\n[term] | [definition]`,
+        
+        'association': `Create EXACTLY ${questionsForThisType} real association questions (no more, no less).\nFormat each as:\nQ: [main concept]\na. [item a]\nb. [item b]\nA) Only a is associated\nB) Only b is associated\nC) Both are associated\nD) Neither is associated\nCorrect: [A/B/C/D]`,
+        
+        'case-study': `Create EXACTLY ${questionsForThisType} case study questions (no more, no less).\nFormat each as:\nCase: [scenario]\nQ: [question]\nA) [option]\nB) [option]\nC) [option]\nD) [option]\nCorrect: [A/B/C/D]`,
+        
+        'odd-one-out': `Create EXACTLY ${questionsForThisType} "Odd One Out" questions (no more, no less).\nFormat each as:\nQ: Which is the odd one out?\nA) [item]\nB) [item]\nC) [item]\nD) [item]\nCorrect: [A/B/C/D]`,
+        
+        'except-questions': `Create EXACTLY ${questionsForThisType} "All EXCEPT" questions (no more, no less).\nFormat each as:\nQ: All of the following are [category] EXCEPT:\nA) [option]\nB) [option]\nC) [option]\nD) [option]\nCorrect: [A/B/C/D]`
+      };
       
-      'multiple-choice': `Create ${questionsPerType} multiple choice questions with 4 options each.\nFormat each as:\nQ: [question]\nA) [option]\nB) [option]\nC) [option]\nD) [option]\nCorrect: [A/B/C/D]`,
-      
-      'true-false': `Create ${questionsPerType} true/false statements.\nFormat each as:\nStatement: [statement]\nAnswer: [True/False]\nExplanation: [brief explanation]`,
-      
-      'flashcard': `Create ${questionsPerType} flashcards with memorable content. Use acronyms, mnemonics, or memory techniques when listing multiple items.\nFormat each as:\nFront: [term/question]\nBack: [definition/answer - use acronyms like D.A.R.T for lists]`,
-      
-      'enumeration': `Create ${questionsPerType} enumeration questions.\nFormat as:\nQ: [question asking to list items]\nA: 1. [item], 2. [item], 3. [item]\nMnemonic: [create a helpful acronym or mnemonic]`,
-      
-      'matching': `Create ${questionsPerType} matching pairs.\nFormat as:\nColumn A | Column B\n[term] | [definition]`,
-      
-      'association': `Create ${questionsPerType} association questions. Type: ${associationType}.
-${associationType === 'except' ? 'Create "EXCEPT" questions: "All of the following are [category] EXCEPT:"' : ''}
-${associationType === 'odd-one-out' ? 'Create "Odd One Out" questions: "Which does NOT belong?"' : ''}
-${associationType === 'conditional' ? 'Create conditional statement questions with options: A) If statement 1 is true, B) If statement 2 is true, C) If both are true, D) If neither is true' : ''}
-${associationType === 'mix' ? 'Mix "EXCEPT", "Odd One Out", and conditional statement questions.' : ''}
-Format each as:\nQ: [question]\nA) [option]\nB) [option]\nC) [option]\nD) [option]\nCorrect: [A/B/C/D]`
-    };
+      prompts.push(typePrompts[type] || typePrompts['identification']);
+    });
     
-    prompts.push(typePrompts[type] || typePrompts['identification']);
-  });
-  
   let specialInstruction = '';
   if (specialInstructions && specialInstructions.trim()) {
     specialInstruction = `\n\n🎯 SPECIAL REQUIREMENTS (MUST FOLLOW):\n${specialInstructions}\n\n⚠️ CRITICAL: Apply these requirements to ALL questions. Ensure questions clearly reflect these specifications.`;
@@ -151,7 +159,10 @@ router.post('/', verifyToken, async (req, res) => {
       types,
       count || 10,
       specialInstructions || '',
-      associationType || 'mix'
+      {
+        associationType: req.body.associationType || 'real-association',
+        trueFalseVariant: req.body.trueFalseVariant || 'traditional'
+      }
     );
 
     res.json({

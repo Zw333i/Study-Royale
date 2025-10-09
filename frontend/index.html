@@ -271,15 +271,6 @@
                         </select>
                     </div>
 
-                    <div class="form-group" id="associationTypeGroup" style="display: none;">
-                        <label>Association Question Type</label>
-                        <select id="associationType" class="form-control">
-                            <option value="except">EXCEPT Questions (All are X except...)</option>
-                            <option value="odd-one-out">Odd One Out (Which does NOT belong?)</option>
-                            <option value="mix">Mix of Both</option>
-                        </select>
-                    </div>
-
                     <div class="form-group">
                         <label>Paste Your Questions Here</label>
                         <textarea id="importQuestions" class="form-control import-textarea" rows="12" placeholder="Format below..."></textarea>
@@ -367,38 +358,60 @@ Answer: B
 
             <div class="modal-body">
                 <div class="form-group">
+                    <label>Study Mode</label>
+                    <button type="button" class="btn-primary" onclick="startLearnMode()" style="margin-bottom: 20px;">
+                        <span>💬 Learn Mode - Chat with AI about your material</span>
+                    </button>
+                </div>
+                <div class="form-group">
                     <label>Select Quiz Types (Multi-select)</label>
                     <p class="helper-text">Click multiple types to create a mixed quiz</p>
-                    <div class="quiz-types">
-                        <button type="button" class="quiz-type-btn" data-type="identification">
-                            <span class="type-icon">📝</span>
-                            <span>Identification</span>
-                        </button>
-                        <button type="button" class="quiz-type-btn" data-type="multiple-choice">
-                            <span class="type-icon">✅</span>
-                            <span>Multiple Choice</span>
-                        </button>
-                        <button type="button" class="quiz-type-btn" data-type="true-false">
-                            <span class="type-icon">✔</span>
-                            <span>True or False</span>
-                        </button>
-                        <button type="button" class="quiz-type-btn" data-type="association">
-                            <span class="type-icon">🔗</span>
-                            <span>Association</span>
-                        </button>
-                        <button type="button" class="quiz-type-btn" data-type="enumeration">
-                            <span class="type-icon">📋</span>
-                            <span>Enumeration</span>
-                        </button>
-                        <button type="button" class="quiz-type-btn" data-type="matching">
-                            <span class="type-icon">🔀</span>
-                            <span>Matching Type</span>
-                        </button>
-                        <button type="button" class="quiz-type-btn" data-type="flashcard">
-                            <span class="type-icon">🃏</span>
-                            <span>Flashcards</span>
-                        </button>
-                    </div>
+                <div class="quiz-types">
+                    <button type="button" class="quiz-type-btn" data-type="fill-blank">
+                        <span class="type-icon">📝</span>
+                        <span>Fill in the Blank</span>
+                    </button>
+                    <button type="button" class="quiz-type-btn" data-type="identification">
+                        <span class="type-icon">🔍</span>
+                        <span>Identification</span>
+                    </button>
+                    <button type="button" class="quiz-type-btn" data-type="multiple-choice">
+                        <span class="type-icon">✅</span>
+                        <span>Multiple Choice</span>
+                    </button>
+                    <button type="button" class="quiz-type-btn" data-type="true-false">
+                        <span class="type-icon">✓</span>
+                        <span>True or False</span>
+                    </button>
+                    <button type="button" class="quiz-type-btn" data-type="association">
+                        <span class="type-icon">🔗</span>
+                        <span>Association</span>
+                    </button>
+                    <button type="button" class="quiz-type-btn" data-type="case-study">
+                        <span class="type-icon">📋</span>
+                        <span>Case Study</span>
+                    </button>
+                    <button type="button" class="quiz-type-btn" data-type="odd-one-out">
+                        <span class="type-icon">🎯</span>
+                        <span>Odd One Out</span>
+                    </button>
+                    <button type="button" class="quiz-type-btn" data-type="except-questions">
+                        <span class="type-icon">❌</span>
+                        <span>EXCEPT Questions</span>
+                    </button>
+                    <button type="button" class="quiz-type-btn" data-type="enumeration">
+                        <span class="type-icon">📊</span>
+                        <span>Enumeration</span>
+                    </button>
+                    <button type="button" class="quiz-type-btn" data-type="matching">
+                        <span class="type-icon">🔀</span>
+                        <span>Matching Type</span>
+                    </button>
+                    <button type="button" class="quiz-type-btn" data-type="flashcard">
+                        <span class="type-icon">🃏</span>
+                        <span>Flashcards</span>
+                    </button>
+                </div>
                 </div>
 
                 <div class="form-group">
@@ -406,20 +419,14 @@ Answer: B
                     <input type="number" id="questionCount" class="form-control" value="10" min="1" max="50">
                 </div>
 
-                <div class="form-group" id="modalAssociationTypeGroup" style="display: none;">
-                    <label>Association Question Type</label>
-                    <select id="modalAssociationType" class="form-control">
-                        <option value="except">EXCEPT Questions (All are X except...)</option>
-                        <option value="odd-one-out">Odd One Out (Which does NOT belong?)</option>
-                        <option value="conditional">Conditional Statements (If statement 1/2 is true)</option>
-                        <option value="mix">Mix of All Types</option>
+                <div class="form-group" id="modalTrueFalseGroup" style="display: none;">
+                    <label>True/False Variant</label>
+                    <select id="modalTrueFalseType" class="form-control">
+                        <option value="traditional">Traditional (True/False)</option>
+                        <option value="conditional">Conditional (If statement 1 is true...)</option>
                     </select>
                     <small class="helper-text">
-                        <strong>Conditional format:</strong><br>
-                        A) If statement 1 is true<br>
-                        B) If statement 2 is true<br>
-                        C) If both are true<br>
-                        D) If neither is true
+                        <strong>Conditional format:</strong> If statement 1 is true, then statement 2 is: (True/False/Cannot be determined)
                     </small>
                 </div>
 
