@@ -161,51 +161,81 @@
 
     <!-- Main App -->
     <div id="appPage" class="page">
-        <!-- Navigation Bar -->
-        <nav class="navbar">
-            <div class="nav-brand">
-                <div class="crown-container-nav">
-                    <div class="king">
-                        <div class="crown">
-                            <div class="crown top-left"></div>
-                            <div class="crown top-middle"></div>
-                            <div class="crown top-right"></div>
-                            <div class="crown back-left"></div>
-                            <div class="crown back-right"></div>
-                            <div class="crown middle"></div>
-                            <div class="crown bottom"></div>
-                        </div>
-                        <div class="jewel">
-                            <div class="jewel red left"></div>
-                            <div class="jewel blue"></div>
-                            <div class="jewel red right"></div>
-                        </div>
+    <!-- Navigation Bar -->
+    <nav class="navbar">
+        <div class="nav-brand">
+            <div class="crown-container-nav">
+                <div class="king">
+                    <div class="crown">
+                        <div class="crown top-left"></div>
+                        <div class="crown top-middle"></div>
+                        <div class="crown top-right"></div>
+                        <div class="crown back-left"></div>
+                        <div class="crown back-right"></div>
+                        <div class="crown middle"></div>
+                        <div class="crown bottom"></div>
                     </div>
-                </div>
-                <p class="brand-name">Study Royale</p>
-            </div>
-            <div class="nav-menu">
-                <a href="#" class="nav-item active" data-page="upload">Upload</a>
-                <a href="#" class="nav-item" data-page="import">Import</a>
-                <a href="#" class="nav-item" data-page="materials">My Materials</a>
-            </div>
-            <div class="nav-user">
-                <label for="switch" class="switch">
-                    <input id="switch" type="checkbox" onchange="toggleDarkMode()" />
-                    <span class="slider"></span>
-                    <span class="decoration"></span>
-                </label>
-                <div class="user-dropdown">
-                    <button class="user-button" onclick="toggleUserMenu()">
-                        <span id="userName">User</span>
-                        <span class="dropdown-arrow">▼</span>
-                    </button>
-                    <div class="dropdown-menu" id="userMenu">
-                        <button onclick="logout()">Logout</button>
+                    <div class="jewel">
+                        <div class="jewel red left"></div>
+                        <div class="jewel blue"></div>
+                        <div class="jewel red right"></div>
                     </div>
                 </div>
             </div>
-        </nav>
+            <p class="brand-name">Study Royale</p>
+        </div>
+        
+        <!-- Hamburger Toggle -->
+        <button class="hamburger" id="hamburgerBtn" onclick="toggleMobileMenu()">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        
+        <!-- Mobile Menu Overlay -->
+        <div class="mobile-menu-overlay" id="mobileMenuOverlay" onclick="closeMobileMenu()"></div>
+        
+        <!-- Navigation Menu -->
+        <div class="nav-menu" id="navMenu">
+            <a href="#" class="nav-item active" data-page="upload" onclick="closeMobileMenu()">Upload</a>
+            <a href="#" class="nav-item" data-page="import" onclick="closeMobileMenu()">Import</a>
+            <a href="#" class="nav-item" data-page="materials" onclick="closeMobileMenu()">My Materials</a>
+            
+            <!-- Mobile-only elements -->
+            <div class="mobile-only-nav">
+                <div class="mobile-theme-toggle">
+                    <span>Appearance</span>
+                    <label for="switch" class="switch">
+                        <input id="switch" type="checkbox" onchange="toggleDarkMode()" />
+                        <span class="slider"></span>
+                        <span class="decoration"></span>
+                    </label>
+                </div>
+                <div class="mobile-user-info">
+                    <span id="mobileUserName">User</span>
+                    <button class="mobile-logout-btn" onclick="logout(); closeMobileMenu();">Logout</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Desktop User Section -->
+        <div class="nav-user">
+            <label for="switch-desktop" class="switch">
+                <input id="switch-desktop" type="checkbox" onchange="toggleDarkMode()" />
+                <span class="slider"></span>
+                <span class="decoration"></span>
+            </label>
+            <div class="user-dropdown">
+                <button class="user-button" onclick="toggleUserMenu()">
+                    <span id="userName">User</span>
+                    <span class="dropdown-arrow">▼</span>
+                </button>
+                <div class="dropdown-menu" id="userMenu">
+                    <button onclick="logout()">Logout</button>
+                </div>
+            </div>
+        </div>
+    </nav>
         
         <!-- Upload Section -->
         <div id="uploadSection" class="section active">
@@ -341,7 +371,7 @@ Answer: B
             </div>
             <div id="quizContent"></div>
             <div class="quiz-actions">
-                <button class="btn-secondary" onclick="exitQuiz()">Exit Quiz</button>
+                <button class="btn-secondary" onclick="exitQuiz()">Exit</button>
                 <button class="btn-primary" onclick="submitQuiz()" id="submitBtn">Submit Answers</button>
             </div>
         </div>

@@ -1,11 +1,11 @@
-// app.js - Complete Enhanced Version
+// app.js
 const API_URL = window.location.hostname === 'localhost'
   ? 'http://localhost:3000/api'
   : 'https://study-royale.up.railway.app/api';
 
 let currentUser = null;
 let currentReviewerId = null;
-let selectedQuizTypes = []; // Changed to array for multi-select
+let selectedQuizTypes = []; 
 let currentQuestions = [];
 let userToken = null;
 let confirmationResult = null;
@@ -17,6 +17,38 @@ let quizSubmitted = false;
 let learnMessages = [];
 let learnInput = '';
 let currentLearnReviewerId = null;
+
+// ===== THROTTLING UTILITY =====
+const throttledFunctions = new Map();
+
+function throttle(func, delay = 1000) {
+    const funcName = func.name || 'anonymous';
+    
+    return function(...args) {
+        if (throttledFunctions.has(funcName)) {
+            showAlert('Please wait before trying again', 'error');
+            return;
+        }
+        
+        throttledFunctions.set(funcName, true);
+        
+        const result = func.apply(this, args);
+        
+        setTimeout(() => {
+            throttledFunctions.delete(funcName);
+        }, delay);
+        
+        return result;
+    };
+}
+
+function debounce(func, delay = 500) {
+    let timeoutId;
+    return function(...args) {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => func.apply(this, args), delay);
+    };
+}
 
 // ===== SESSION TIMEOUT =====
 let sessionTimeout;
@@ -59,6 +91,13 @@ auth.onAuthStateChanged(async (user) => {
         await loadImportedQuizzes();
         showAppPage();
         loadReviewers();
+        
+        // Update both desktop and mobile usernames
+        const displayName = user.displayName || user.email;
+        const userNameElement = document.getElementById('userName');
+        const mobileUserNameElement = document.getElementById('mobileUserName');
+        if (userNameElement) userNameElement.textContent = displayName;
+        if (mobileUserNameElement) mobileUserNameElement.textContent = displayName;
     } else {
         clearTimeout(sessionTimeout);
         currentUser = null;
@@ -71,13 +110,16 @@ auth.onAuthStateChanged(async (user) => {
 // ===== DARK MODE TOGGLE =====
 function toggleDarkMode() {
     const body = document.body;
-    const isChecked = document.getElementById('switch').checked;
+    const desktopSwitch = document.getElementById('switch-desktop');
+    const mobileSwitch = document.getElementById('switch');
     
-    if (isChecked) {
-        body.classList.add('light-mode');
-    } else {
-        body.classList.remove('light-mode');
-    }
+    // Toggle light mode
+    body.classList.toggle('light-mode');
+    
+    // Sync both switches
+    const isLightMode = body.classList.contains('light-mode');
+    if (desktopSwitch) desktopSwitch.checked = isLightMode;
+    if (mobileSwitch) mobileSwitch.checked = isLightMode;
 }
 
 // Set minimum date to today and load dark mode preference
@@ -173,17 +215,53 @@ async function login(event) {
     
     const email = document.getElementById('loginEmail').value.trim();
     const password = document.getElementById('loginPassword').value;
-
-    if (!email || !password) {
-        showAlert('Please fill in all fields', 'error');
+    
+    // Validation
+    const errors = [];
+    
+    if (!email) {
+        errors.push('Email is required');
+    } else if (!validateEmail(email)) {
+        errors.push('Please enter a valid email address');
+    }
+    
+    if (!password) {
+        errors.push('Password is required');
+    }
+    
+    if (errors.length > 0) {
+        showValidationErrors(errors);
         return;
     }
-
+    
+    const loginBtn = event.target.querySelector('button[type="submit"]');
+    const originalText = loginBtn.textContent;
+    
     try {
+        loginBtn.disabled = true;
+        loginBtn.textContent = 'Signing in...';
+        
         await auth.signInWithEmailAndPassword(email, password);
-        showAlert('Welcome back!');
+        showAlert('Welcome back! 🎉');
     } catch (error) {
-        showAlert(error.message, 'error');
+        let errorMessage = 'Login failed';
+        
+        if (error.code === 'auth/user-not-found') {
+            errorMessage = 'No account found with this email';
+        } else if (error.code === 'auth/wrong-password') {
+            errorMessage = 'Incorrect password';
+        } else if (error.code === 'auth/invalid-email') {
+            errorMessage = 'Invalid email format';
+        } else if (error.code === 'auth/user-disabled') {
+            errorMessage = 'This account has been disabled';
+        } else if (error.code === 'auth/too-many-requests') {
+            errorMessage = 'Too many failed attempts. Please try again later';
+        }
+        
+        showAlert(errorMessage, 'error');
+    } finally {
+        loginBtn.disabled = false;
+        loginBtn.textContent = originalText;
     }
 }
 
@@ -193,23 +271,59 @@ async function signup(event) {
     const name = document.getElementById('signupName').value.trim();
     const email = document.getElementById('signupEmail').value.trim();
     const password = document.getElementById('signupPassword').value;
-
-    if (!name || !email || !password) {
-        showAlert('Please fill in all fields', 'error');
+    
+    // Validation
+    const errors = [];
+    
+    if (!name) {
+        errors.push('Display name is required');
+    } else if (name.length < 2) {
+        errors.push('Display name must be at least 2 characters');
+    }
+    
+    if (!email) {
+        errors.push('Email is required');
+    } else if (!validateEmail(email)) {
+        errors.push('Please enter a valid email address');
+    }
+    
+    if (!password) {
+        errors.push('Password is required');
+    } else if (!validatePassword(password)) {
+        errors.push('Password must be at least 6 characters');
+    }
+    
+    if (errors.length > 0) {
+        showValidationErrors(errors);
         return;
     }
-
-    if (password.length < 6) {
-        showAlert('Password must be at least 6 characters', 'error');
-        return;
-    }
-
+    
+    const signupBtn = event.target.querySelector('button[type="submit"]');
+    const originalText = signupBtn.textContent;
+    
     try {
+        signupBtn.disabled = true;
+        signupBtn.textContent = 'Creating account...';
+        
         const result = await auth.createUserWithEmailAndPassword(email, password);
         await result.user.updateProfile({ displayName: name });
-        showAlert('Account created successfully!');
+        
+        showAlert('Account created successfully! Welcome to Study Royale! 🎉');
     } catch (error) {
-        showAlert(error.message, 'error');
+        let errorMessage = 'Signup failed';
+        
+        if (error.code === 'auth/email-already-in-use') {
+            errorMessage = 'An account with this email already exists';
+        } else if (error.code === 'auth/invalid-email') {
+            errorMessage = 'Invalid email format';
+        } else if (error.code === 'auth/weak-password') {
+            errorMessage = 'Password is too weak. Use at least 6 characters';
+        }
+        
+        showAlert(errorMessage, 'error');
+    } finally {
+        signupBtn.disabled = false;
+        signupBtn.textContent = originalText;
     }
 }
 
@@ -258,20 +372,27 @@ auth.getRedirectResult().then((result) => {
     }
 });
 
-async function sendVerificationCode() {
+const sendVerificationCode = throttle(async function() {
     const phoneNumber = document.getElementById('phoneNumber').value.trim();
     const sendBtn = document.getElementById('sendCodeBtn');
-
+    
+    // Validation
+    const errors = [];
+    
     if (!phoneNumber) {
-        showAlert('Please enter your phone number', 'error');
+        errors.push('Phone number is required');
+    } else if (!phoneNumber.startsWith('+')) {
+        errors.push('Phone number must include country code (e.g., +63)');
+    } else if (!validatePhoneNumber(phoneNumber)) {
+        errors.push('Invalid Philippines phone format. Use: +639171234567');
+    }
+    
+    if (errors.length > 0) {
+        showValidationErrors(errors);
         return;
     }
-
-    if (!phoneNumber.startsWith('+')) {
-        showAlert('Phone number must include country code (e.g., +63)', 'error');
-        return;
-    }
-
+    
+    const originalText = sendBtn.textContent;
     sendBtn.disabled = true;
     sendBtn.textContent = 'Sending...';
 
@@ -288,28 +409,35 @@ async function sendVerificationCode() {
         const appVerifier = window.recaptchaVerifier;
         confirmationResult = await auth.signInWithPhoneNumber(phoneNumber, appVerifier);
         
-        showAlert('Verification code sent to your phone!');
+        showAlert('Verification code sent to your phone! 📱', 'success');
         document.getElementById('verificationCodeSection').classList.remove('hidden');
-        sendBtn.textContent = 'Code Sent!';
+        sendBtn.textContent = 'Code Sent ✓';
         
     } catch (error) {
         console.error('SMS send error:', error);
+        
+        let errorMessage = 'Failed to send verification code';
+        
         if (error.code === 'auth/invalid-phone-number') {
-            showAlert('Invalid phone number format', 'error');
+            errorMessage = 'Invalid phone number format';
         } else if (error.code === 'auth/too-many-requests') {
-            showAlert('Too many requests. Please try again later.', 'error');
-        } else {
-            showAlert('Failed to send code: ' + error.message, 'error');
+            errorMessage = 'Too many requests. Please try again in a few minutes';
+        } else if (error.code === 'auth/billing-not-enabled') {
+            errorMessage = 'Phone authentication requires a paid Firebase plan. Please use email or Google sign-in instead.';
+        } else if (error.code === 'auth/captcha-check-failed') {
+            errorMessage = 'reCAPTCHA verification failed. Please try again';
         }
+        
+        showAlert(errorMessage, 'error');
         sendBtn.disabled = false;
-        sendBtn.textContent = 'Send Code';
+        sendBtn.textContent = originalText;
         
         if (window.recaptchaVerifier) {
             window.recaptchaVerifier.clear();
             window.recaptchaVerifier = null;
         }
     }
-}
+}, 3000); // 3 second throttle
 
 async function verifyPhoneCode() {
     const code = document.getElementById('verificationCode').value.trim();
@@ -347,13 +475,83 @@ async function logout() {
 }
 
 // ===== UI FUNCTIONS =====
-function showAlert(message, type = 'success') {
+function showAlert(message, type = 'success', duration = 5000) {
     const container = document.getElementById('alertContainer');
+    if (!container) return;
+    
     const alert = document.createElement('div');
     alert.className = `alert alert-${type}`;
-    alert.textContent = message;
+    
+    const icons = {
+        success: '✓',
+        error: '✕',
+        warning: '⚠',
+        info: 'ℹ'
+    };
+    
+    alert.innerHTML = `
+        <span class="alert-icon">${icons[type] || icons.info}</span>
+        <span class="alert-message">${message}</span>
+        <button class="alert-close" onclick="this.parentElement.remove()">×</button>
+    `;
+    
     container.appendChild(alert);
-    setTimeout(() => alert.remove(), 5000);
+    
+    setTimeout(() => {
+        alert.style.animation = 'slideUp 0.3s ease-out';
+        setTimeout(() => alert.remove(), 300);
+    }, duration);
+}
+
+function showValidationErrors(errors) {
+    const container = document.getElementById('alertContainer');
+    if (!container) return;
+    
+    const alert = document.createElement('div');
+    alert.className = 'alert alert-error alert-list';
+    
+    const errorList = errors.map(err => `<li>${err}</li>`).join('');
+    
+    alert.innerHTML = `
+        <span class="alert-icon">⚠</span>
+        <div class="alert-content">
+            <strong>Please fix the following:</strong>
+            <ul>${errorList}</ul>
+        </div>
+        <button class="alert-close" onclick="this.parentElement.remove()">×</button>
+    `;
+    
+    container.appendChild(alert);
+    
+    setTimeout(() => {
+        alert.style.animation = 'slideUp 0.3s ease-out';
+        setTimeout(() => alert.remove(), 300);
+    }, 7000);
+}
+
+// ===== FORM VALIDATION =====
+function validateEmail(email) {
+    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return re.test(email);
+}
+
+function validatePhoneNumber(phone) {
+    // Philippines format: +63 followed by 10 digits
+    const re = /^\+63\d{10}$/;
+    return re.test(phone);
+}
+
+function validatePassword(password) {
+    return password.length >= 6;
+}
+
+function validateFileSize(file, maxSizeMB = 20) {
+    return file.size <= maxSizeMB * 1024 * 1024;
+}
+
+function validateFileType(file, allowedTypes = ['.pdf', '.docx', '.txt']) {
+    const ext = '.' + file.name.split('.').pop().toLowerCase();
+    return allowedTypes.includes(ext);
 }
 
 function togglePassword(inputId) {
@@ -454,31 +652,60 @@ function handleFileSelect(input) {
     }
 }
 
-async function uploadFiles() {
+const uploadFiles = throttle(async function() {
     const fileInput = document.getElementById('fileInput');
     const examDate = document.getElementById('examDate').value;
     const uploadBtn = document.getElementById('uploadBtn');
     const mergeOption = document.getElementById('mergeOption').value;
-
-    if (!fileInput.files || fileInput.files.length === 0 || !examDate) {
-        showAlert('Please select at least one file and exam date', 'error');
-        return;
+    
+    // Validation
+    const errors = [];
+    
+    if (!fileInput.files || fileInput.files.length === 0) {
+        errors.push('Please select at least one file');
     }
-
-    for (let file of fileInput.files) {
-        if (file.size > 20 * 1024 * 1024) {
-            showAlert(`File "${file.name}" exceeds 20MB limit`, 'error');
-            return;
+    
+    if (!examDate) {
+        errors.push('Please select an exam date');
+    } else {
+        const selectedDate = new Date(examDate);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        if (selectedDate < today) {
+            errors.push('Exam date cannot be in the past');
         }
     }
-
+    
+    // Validate each file
+    if (fileInput.files) {
+        for (let file of fileInput.files) {
+            if (!validateFileType(file)) {
+                errors.push(`"${file.name}" - Only PDF, DOCX, and TXT files are allowed`);
+            }
+            if (!validateFileSize(file, 20)) {
+                errors.push(`"${file.name}" - File size exceeds 20MB limit`);
+            }
+        }
+    }
+    
+    if (errors.length > 0) {
+        showValidationErrors(errors);
+        return;
+    }
+    
+    const originalText = uploadBtn.textContent;
     uploadBtn.disabled = true;
-    uploadBtn.textContent = 'Processing...';
+    uploadBtn.textContent = 'Uploading...';
 
     try {
         if (fileInput.files.length === 1 || mergeOption === 'separate') {
             let successCount = 0;
+            const totalFiles = fileInput.files.length;
+            
             for (let i = 0; i < fileInput.files.length; i++) {
+                uploadBtn.textContent = `Uploading ${i + 1}/${totalFiles}...`;
+                
                 const formData = new FormData();
                 formData.append('file', fileInput.files[i]);
                 formData.append('examDate', examDate);
@@ -498,11 +725,13 @@ async function uploadFiles() {
             }
             
             if (successCount === fileInput.files.length) {
-                showAlert(`${successCount} file(s) uploaded successfully!`);
+                showAlert(`✓ Successfully uploaded ${successCount} file(s)!`, 'success');
             } else {
-                showAlert(`${successCount} of ${fileInput.files.length} files uploaded`, 'error');
+                showAlert(`⚠ Uploaded ${successCount} of ${totalFiles} files`, 'warning');
             }
         } else {
+            uploadBtn.textContent = 'Merging and uploading...';
+            
             const formData = new FormData();
             for (let i = 0; i < fileInput.files.length; i++) {
                 formData.append('files', fileInput.files[i]);
@@ -520,27 +749,32 @@ async function uploadFiles() {
             const data = await response.json();
 
             if (data.success) {
-                showAlert('Files merged and uploaded successfully!');
+                showAlert(`✓ Files merged and uploaded successfully! (${data.fileCount} files combined)`, 'success');
             } else {
                 showAlert(data.error || 'Upload failed', 'error');
             }
         }
 
+        // Reset form
         fileInput.value = '';
         document.getElementById('fileNames').innerHTML = '';
         document.getElementById('examDate').value = '';
         document.getElementById('mergeOptionsContainer').style.display = 'none';
-        loadReviewers();
         
-        document.querySelector('[data-page="materials"]').click();
+        loadReviewers();
+        showAlert('✓ Redirecting to My Materials...', 'info', 2000);
+        
+        setTimeout(() => {
+            document.querySelector('[data-page="materials"]').click();
+        }, 2000);
 
     } catch (error) {
         showAlert('Network error: ' + error.message, 'error');
     } finally {
         uploadBtn.disabled = false;
-        uploadBtn.textContent = 'Upload';
+        uploadBtn.textContent = originalText;
     }
-}
+}, 2000); // 2 second throttle
 
 // ===== IMPORT QUIZ =====
 function updateImportExample() {
@@ -607,18 +841,33 @@ Answer: C</pre>`
     exampleDiv.innerHTML = examples[quizType] || examples['multiple-choice'];
 }
 
-function importQuiz() {
+const importQuiz = throttle(function() {
     const title = document.getElementById('importTitle').value.trim();
     const quizType = document.getElementById('importQuizType').value;
     const questionsText = document.getElementById('importQuestions').value.trim();
     
-    if (!title || !questionsText) {
-        showAlert('Provide title and questions! -_-', 'error');
+    // Validation
+    const errors = [];
+    
+    if (!title) {
+        errors.push('Quiz title is required');
+    } else if (title.length < 3) {
+        errors.push('Quiz title must be at least 3 characters');
+    }
+    
+    if (!questionsText) {
+        errors.push('Questions text is required');
+    } else if (questionsText.length < 20) {
+        errors.push('Please provide more detailed questions (minimum 20 characters)');
+    }
+    
+    if (errors.length > 0) {
+        showValidationErrors(errors);
         return;
     }
     
     saveImportedQuizToDatabase(title, quizType, questionsText, 'mix');
-}
+}, 2000);
 
 async function saveImportedQuizToDatabase(title, type, questionsText, associationType = 'mix') {
     const importBtn = document.getElementById('importBtn');
@@ -1199,13 +1448,28 @@ function closeModal() {
     document.getElementById('quizModal').classList.remove('active');
 }
 
-async function generateWithSettings() {
+const generateWithSettings = throttle(async function() {
+    // Validation
+    const errors = [];
+    
     if (selectedQuizTypes.length === 0) {
-        showAlert('Please select at least one quiz type', 'error');
-        return;
+        errors.push('Please select at least one quiz type');
     }
 
     const count = document.getElementById('questionCount').value;
+    if (!count || count < 1) {
+        errors.push('Please specify number of questions (minimum 1)');
+    } else if (count > 50) {
+        errors.push('Maximum 50 questions allowed');
+    }
+    
+    if (errors.length > 0) {
+        showValidationErrors(errors);
+        return;
+    }
+    
+    showAlert('🔄 Generating your quiz...', 'info', 3000);
+    
     const instructions = document.getElementById('specialInstructions').value.trim();
     
     let trueFalseVariant = 'traditional';
@@ -1214,7 +1478,6 @@ async function generateWithSettings() {
         trueFalseVariant = document.getElementById('modalTrueFalseType').value;
     }
     
-    // Store types before clearing
     const typesToGenerate = [...selectedQuizTypes];
     
     const requestBody = {
@@ -1225,15 +1488,13 @@ async function generateWithSettings() {
         trueFalseVariant: trueFalseVariant
     };
     
-    console.log('Sending request:', requestBody);
-    
     closeModal();
     showQuizPage();
 
     const quizContent = document.getElementById('quizContent');
     const quizTitle = document.getElementById('quizTitle');
 
-    quizContent.innerHTML = '<div class="loading"><div class="spinner"></div><p class="loading-text">Generating your quiz...</p></div>';
+    quizContent.innerHTML = '<div class="loading"><div class="spinner"></div><p class="loading-text">AI is generating your personalized quiz...</p></div>';
     quizTitle.textContent = `Generating ${typesToGenerate.length} type(s) of quiz...`;
 
     try {
@@ -1247,22 +1508,22 @@ async function generateWithSettings() {
         });
 
         const data = await response.json();
-        console.log('Response:', data);
 
         if (data.success) {
             quizTitle.textContent = `Mixed Quiz (${typesToGenerate.join(', ')})`;
             displayQuestions(data.questions, typesToGenerate);
+            showAlert('✓ Quiz generated successfully!', 'success');
         } else {
             quizContent.innerHTML = `<p style="color: var(--error); text-align: center;">Failed to generate questions: ${data.error}</p>`;
+            showAlert('Failed to generate quiz', 'error');
         }
     } catch (error) {
-        console.error('Request error:', error);
         quizContent.innerHTML = `<p style="color: var(--error); text-align: center;">Network error: ${error.message}</p>`;
+        showAlert('Network error occurred', 'error');
     }
     
-    // Clear after request is made
     selectedQuizTypes = [];
-}
+}, 3000); // 3 second throttle
 
 // ===== DISPLAY QUESTIONS (MIXED TYPES) =====
 function displayQuestions(questionsText, questionTypes) {
@@ -1780,17 +2041,44 @@ async function checkAnswerWithAI(userAnswer, correctAnswer, questionText) {
 }
 
 // ===== AI CHECKING =====
-async function submitQuiz() {
+const submitQuiz = throttle(async function() {
     const questions = document.querySelectorAll('.question-card');
+    
+    if (questions.length === 0) {
+        showAlert('No questions to submit', 'error');
+        return;
+    }
+    
+    // Check if any questions are unanswered
+    let unansweredCount = 0;
+    questions.forEach(question => {
+        const textInput = question.querySelector('input[type="text"]');
+        const textArea = question.querySelector('textarea');
+        const selectedOption = question.querySelector('.option.selected');
+        const isMatching = question.classList.contains('matching-card');
+        
+        if (!isMatching && !textInput && !textArea && !selectedOption) {
+            unansweredCount++;
+        } else if (textInput && !textInput.value.trim()) {
+            unansweredCount++;
+        } else if (textArea && !textArea.value.trim()) {
+            unansweredCount++;
+        }
+    });
+    
+    if (unansweredCount > 0) {
+        const confirmed = confirm(`You have ${unansweredCount} unanswered question(s). Submit anyway?`);
+        if (!confirmed) return;
+    }
+    
+    showAlert('🔍 Checking your answers with AI...', 'info', 3000);
+    
     let correct = 0;
     let total = 0;
-    
-    showAlert('Checking answers with AI...', 'success');
     
     for (const [idx, question] of Array.from(questions).entries()) {
         total++;
 
-        // Check if its matching question
         if (question.classList.contains('matching-card')) {
             const isComplete = question.dataset.complete === 'true';
             if (isComplete) {
@@ -1800,7 +2088,6 @@ async function submitQuiz() {
                 question.style.borderColor = 'var(--error)';
             }
             
-            // Disable all matching items
             question.querySelectorAll('.matching-item').forEach(item => {
                 item.style.pointerEvents = 'none';
                 item.style.opacity = '0.7';
@@ -1809,7 +2096,6 @@ async function submitQuiz() {
             continue; 
         }
         
-        // Text input (identification)
         const textInput = question.querySelector('input[type="text"]');
         if (textInput) {
             const userAnswer = textInput.value.trim();
@@ -1824,15 +2110,12 @@ async function submitQuiz() {
             if (isCorrect) correct++;
         }
         
-        // Textarea (enumeration or case study)
         const textArea = question.querySelector('textarea');
         if (textArea) {
             const userAnswer = textArea.value.trim();
             const correctAnswer = currentQuestions[idx]?.answer || '';
             const questionText = currentQuestions[idx]?.question || '';
-            const isCaseStudy = currentQuestions[idx]?.type === 'case-study';
             
-            // Use AI checking for both
             const isCorrect = await checkAnswerWithAI(userAnswer, correctAnswer, questionText);
             
             textArea.style.borderColor = isCorrect ? 'var(--success)' : 'var(--error)';
@@ -1841,7 +2124,6 @@ async function submitQuiz() {
             if (isCorrect) correct++;
         }
         
-        // Multiple choice options
         const selectedOption = question.querySelector('.option.selected');
         if (selectedOption) {
             const userAnswer = selectedOption.textContent.trim();
@@ -1863,15 +2145,33 @@ async function submitQuiz() {
         const quizContent = document.getElementById('quizContent');
         const summary = document.createElement('div');
         summary.className = 'results-summary';
+        
+        let emoji = '🎉';
+        let message = '';
+        
+        if (percentage >= 90) {
+            emoji = '🏆';
+            message = 'Outstanding! You\'ve mastered this material!';
+        } else if (percentage >= 80) {
+            emoji = '🎉';
+            message = 'Excellent work! You have a strong understanding!';
+        } else if (percentage >= 70) {
+            emoji = '👍';
+            message = 'Good job! Review the explanations to improve further.';
+        } else if (percentage >= 60) {
+            emoji = '📚';
+            message = 'Keep practicing! Check the explanations below.';
+        } else {
+            emoji = '💪';
+            message = 'Don\'t give up! Review and try again.';
+        }
+        
         summary.innerHTML = `
+            <div class="results-emoji">${emoji}</div>
             <h2>Quiz Results</h2>
             <div class="score-display">${correct} / ${total}</div>
             <div class="percentage">${percentage}%</div>
-            <p class="results-message">
-                ${percentage >= 80 ? 'Excellent work! You have mastered this material!' : 
-                  percentage >= 60 ? 'Good job! Review the explanations to improve further.' : 
-                  'Keep studying! Check the explanations below for better understanding.'}
-            </p>
+            <p class="results-message">${message}</p>
         `;
         quizContent.insertBefore(summary, quizContent.firstChild);
         summary.scrollIntoView({ behavior: 'smooth' });
@@ -1881,8 +2181,10 @@ async function submitQuiz() {
         
         quizSubmitted = true;
         showChatbot();
+        
+        showAlert(`✓ Quiz submitted! You scored ${percentage}%`, percentage >= 70 ? 'success' : 'warning', 6000);
     }
-}
+}, 3000); // 3 second throttle
 
 // ===== CHATBOT FUNCTIONALITY =====
 function showChatbot() {
@@ -2256,4 +2558,33 @@ function exitQuiz() {
     if (chatbot) {
         chatbot.remove();
     }
+}
+
+// ===== MOBILE MENU FUNCTIONS =====
+function toggleMobileMenu() {
+    const navMenu = document.getElementById('navMenu');
+    const overlay = document.getElementById('mobileMenuOverlay');
+    const hamburger = document.getElementById('hamburgerBtn');
+    
+    navMenu.classList.toggle('active');
+    overlay.classList.toggle('active');
+    hamburger.classList.toggle('active');
+    
+    // Prevent body scroll when menu is open
+    if (navMenu.classList.contains('active')) {
+        document.body.style.overflow = 'hidden';
+    } else {
+        document.body.style.overflow = '';
+    }
+}
+
+function closeMobileMenu() {
+    const navMenu = document.getElementById('navMenu');
+    const overlay = document.getElementById('mobileMenuOverlay');
+    const hamburger = document.getElementById('hamburgerBtn');
+    
+    navMenu.classList.remove('active');
+    overlay.classList.remove('active');
+    hamburger.classList.remove('active');
+    document.body.style.overflow = '';
 }
