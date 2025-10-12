@@ -248,11 +248,18 @@ Study material: ${shortText}
 
 Generate now:`,
 
-    'matching': `Generate EXACTLY ${count} matching pairs.
+'matching': `Generate EXACTLY ${questionsForThisType} matching pairs.
 
-FORMAT (MANDATORY - NO NUMBERING):
+FORMAT (MANDATORY - MUST INCLUDE HEADER):
 Column A | Column B
-[term] | [definition]
+term1 | definition1
+term2 | definition2
+term3 | definition3
+
+CRITICAL: Always start with "Column A | Column B" header line first, then list pairs below.
+Do not skip the header.
+
+Generate now:
 
 Study material: ${shortText}
 
@@ -325,7 +332,6 @@ Generate now:`
   return base;
 }
 
-// Build prompt for Groq
 function buildPrompt(text, questionTypes, count, specialInstructions, questionsData = {}, attempt = 1) {
   const shortText = text.substring(0, 3000);
   
@@ -335,7 +341,6 @@ function buildPrompt(text, questionTypes, count, specialInstructions, questionsD
   
   let prompts = [];
   
-  // Create clear breakdown
   let breakdown = `\n📋 QUESTION DISTRIBUTION (MUST FOLLOW EXACTLY):\n`;
   typesArray.forEach((type, index) => {
     const questionsForThisType = questionsPerType + (index < remainder ? 1 : 0);
@@ -470,10 +475,7 @@ FORMAT (MANDATORY):
 Column A | Column B
 [term] | [definition]
 
-EXAMPLE:
-Column A | Column B
-Static Routing | Manual configuration
-Dynamic Routing | Automatic updates`,
+CRITICAL: The first line MUST be "Column A | Column B" - NEVER skip this header!`,
 
         'association': `
 ═══════════════════════════════════════════════════
@@ -642,11 +644,15 @@ async function validateAndFixQuestions(text, expectedTypes, expectedCount) {
       continue;
     }
     
-    // Count matching
     if (line.startsWith('Column A |')) {
-      questionCounts['matching']++;
-      i++;
-      continue;
+        questionCounts['matching']++;
+        i++;
+        continue;
+    } else if (line.includes(' | ') && !line.startsWith('Q:') && !line.startsWith('A)') && 
+              !line.startsWith('Statement:') && !line.startsWith('Scenario:')) {
+        questionCounts['matching']++;
+        i++;
+        continue;
     }
     
     // Count flashcards
@@ -774,10 +780,13 @@ async function geminiGenerateMissingQuestions(originalText, groqQuestions, expec
       });
       
       let newQuestions = completion.choices[0].message.content.trim();
-      
-      // Clean up any introductory text that Gemini might add
+
       newQuestions = newQuestions.replace(/^(Here are|Here's|Below are|I've generated).*?:\s*/i, '');
       newQuestions = newQuestions.replace(/^(Case Study Questions?|Odd One Out Questions?).*?\n/gim, '');
+
+      if (fix.type === 'matching' && !newQuestions.startsWith('Column A |')) {
+          newQuestions = 'Column A | Column B\n' + newQuestions;
+      }
       
       console.log('📋 GEMINI RAW OUTPUT:');
       console.log(newQuestions);
@@ -918,14 +927,21 @@ Repeat ${count} times.
 
 Material: ${shortText}`,
 
-    'matching': `Generate EXACTLY ${count} matching pairs. Use only this format with NO numbering:
+'matching': `You MUST generate EXACTLY ${count} matching pairs. 
 
+CRITICAL FORMATTING RULES:
+1. ALWAYS start with this exact line first: Column A | Column B
+2. Then list each pair on a new line with format: term | definition
+3. NO extra text, NO numbering, NO sections
+
+EXAMPLE OUTPUT:
 Column A | Column B
-[left item] | [right item]
+Static Routing | Manual route configuration
+Dynamic Routing | Automatic route learning
+RIP | Distance vector protocol
+OSPF | Link state protocol
 
-Repeat ${count} times.
-
-Material: ${shortText}`,
+NOW GENERATE EXACTLY ${count} PAIRS:`,
 
     'except-questions': `Generate EXACTLY ${count} EXCEPT questions. Use only this format with NO numbering:
 

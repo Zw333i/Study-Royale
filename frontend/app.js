@@ -157,11 +157,25 @@ function toggleDarkMode() {
     if (mobileSwitch) mobileSwitch.checked = isLightMode;
 }
 
-// Set minimum date to today and load dark mode preference
 document.addEventListener('DOMContentLoaded', () => {
     const examDateInput = document.getElementById('examDate');
     if (examDateInput) {
         examDateInput.min = new Date().toISOString().split('T')[0];
+        
+        // Real-time validation on change
+        examDateInput.addEventListener('change', () => {
+            const date = new Date(examDateInput.value);
+            const year = date.getFullYear();
+            const currentYear = new Date().getFullYear();
+            
+            if (year > currentYear + 10 || year < currentYear) {
+                examDateInput.style.borderColor = 'var(--error)';
+                examDateInput.title = `Year must be between ${currentYear} and ${currentYear + 10}`;
+            } else {
+                examDateInput.style.borderColor = '';
+                examDateInput.title = '';
+            }
+        });
     }
     
     const lightModeEnabled = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
@@ -736,8 +750,11 @@ function handleFileSelect(input) {
 }
 
 function openUploadConfirmation() {
+    console.log('openUploadConfirmation called');
+    
     const fileInput = document.getElementById('fileInput');
-    const examDate = document.getElementById('examDate').value;
+    const examDateInput = document.getElementById('examDate');
+    const examDate = examDateInput.value;
     
     if (!fileInput.files || fileInput.files.length === 0) {
         showAlert('❌ Please select at least one file to upload', 'error', 4000);
@@ -749,17 +766,38 @@ function openUploadConfirmation() {
         return;
     }
     
-    const errors = [];
-    
+    // Validate exam date format and value
     const selectedDate = new Date(examDate);
+
+    // Check if date is valid (not NaN)
+    if (isNaN(selectedDate.getTime())) {
+        showAlert('⚠ Invalid date format. Please use the date picker.', 'error', 4000);
+        examDateInput.focus();
+        return;
+    }
+
+    // Validate year is reasonable (between current year and 10 years in future)
+    const year = selectedDate.getFullYear();
+    const currentYear = new Date().getFullYear();
+    const maxYear = currentYear + 10;
+
+    if (year < currentYear || year > maxYear) {
+        showAlert(`⚠ Exam year must be between ${currentYear} and ${maxYear}`, 'error', 4000);
+        examDateInput.focus();
+        return;
+    }
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     if (selectedDate < today) {
-        errors.push('Exam date cannot be in the past');
+        showAlert('📅 Exam date cannot be in the past', 'error', 4000);
+        examDateInput.focus();
+        return;
     }
+
+    const errors = [];
     
-    // Validate each file
     if (fileInput.files) {
         for (let file of fileInput.files) {
             if (!validateFileType(file)) {
@@ -776,7 +814,6 @@ function openUploadConfirmation() {
         return;
     }
     
-    // All validation passed - show confirmation modal
     const confirmFileList = document.getElementById('confirmFileList');
     confirmFileList.innerHTML = Array.from(fileInput.files).map(file => `
         <div class="file-item-confirm">
@@ -1845,16 +1882,24 @@ function displayQuestions(questionsText, questionTypes) {
             }
         }
         
-        // ==========================================
         // PRIORITY 4: MATCHING TYPE
-        // ==========================================
-        else if (line.startsWith('Column A |')) {
-            let pairs = [];
-            let j = i + 1;
+        else if (line.startsWith('Column A |') || 
+                (line.includes(' | ') && !line.startsWith('Q:') && !line.startsWith('A)') && 
+                !line.startsWith('Statement:') && !line.startsWith('Scenario:') &&
+                !line.match(/^[A-D]\)/))) {
             
-            while (j < lines.length && lines[j].includes('|')) {
+            let pairs = [];
+            let j = i;
+            
+            // Skip the header if it exists
+            if (line.startsWith('Column A |')) {
+                j = i + 1;
+            }
+            
+            // Collect all pipe-separated pairs
+            while (j < lines.length && lines[j].includes(' | ')) {
                 const parts = lines[j].split('|').map(p => p.trim());
-                if (parts.length === 2 && !parts[0].includes('Column')) {
+                if (parts.length === 2 && parts[0].length > 0 && parts[1].length > 0) {
                     pairs.push({ left: parts[0], right: parts[1] });
                     j++;
                 } else {
@@ -1900,7 +1945,7 @@ function displayQuestions(questionsText, questionTypes) {
                 continue;
             }
         }
-        
+                
         // ==========================================
         // PRIORITY 5: MULTIPLE CHOICE (Q: with options)
         // ==========================================

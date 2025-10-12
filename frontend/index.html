@@ -259,7 +259,13 @@
                     <div class="upload-form">
                         <div class="form-group">
                             <label>Exam Date</label>
-                            <input type="date" id="examDate" class="form-control">
+                            <input 
+                                type="date" 
+                                id="examDate" 
+                                class="form-control"
+                                required
+                                pattern="\d{4}-\d{2}-\d{2}"
+                            >
                         </div>
                         
                         <div id="mergeOptionsContainer" class="form-group" style="display: none;">
