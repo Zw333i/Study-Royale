@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0f1419">
+    <link rel="manifest" href="manifest.json">
     <title>Study Royale - Master Your Knowledge</title>
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -268,9 +270,9 @@
                             </select>
                         </div>
 
-                        <button class="btn-primary btn-block" onclick="uploadFiles()" id="uploadBtn">
-                            Upload
-                        </button>
+                    <button class="btn-primary btn-block" onclick="openUploadConfirmation()" id="uploadBtn">
+                        Upload
+                    </button>
                     </div>
                 </div>
             </div>
@@ -470,6 +472,47 @@ Answer: B
             <div class="modal-footer">
                 <button class="btn-secondary" onclick="closeModal()">Cancel</button>
                 <button class="btn-primary" onclick="generateWithSettings()">Generate Quiz</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- File Upload Confirmation Modal -->
+    <div id="uploadConfirmationModal" class="modal">
+        <div class="modal-overlay" onclick="closeUploadConfirmation()"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Confirm File Upload</h2>
+                <button class="modal-close" onclick="closeUploadConfirmation()">×</button>
+            </div>
+
+            <div class="modal-body">
+                <div class="confirmation-section">
+                    <h3>Files to Upload</h3>
+                    <div id="confirmFileList" class="file-list-confirmation"></div>
+                </div>
+
+                <div class="confirmation-section">
+                    <h3>Exam Date</h3>
+                    <p id="confirmExamDate" class="exam-date-display"></p>
+                </div>
+
+                <div class="confirmation-section info-section">
+                    <p class="info-text">
+                        <strong>Note:</strong> Your files will be automatically deleted after the exam date for storage optimization. You can always re-upload if needed.
+                    </p>
+                </div>
+
+                <div class="confirmation-section">
+                    <label>
+                        <input type="checkbox" id="mergeConfirm" checked>
+                        <span>Merge files into one material</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeUploadConfirmation()">Cancel</button>
+                <button class="btn-primary" onclick="proceedWithUpload()" id="confirmUploadBtn">Confirm Upload</button>
             </div>
         </div>
     </div>

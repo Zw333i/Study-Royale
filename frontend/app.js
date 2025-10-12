@@ -18,6 +18,10 @@ let learnMessages = [];
 let learnInput = '';
 let currentLearnReviewerId = null;
 
+let materialsPageCurrent = 1;
+const materialsPageSize = 5; 
+let totalMaterialsCount = 0;
+
 // ===== THROTTLING UTILITY =====
 const throttledFunctions = new Map();
 
@@ -52,20 +56,51 @@ function debounce(func, delay = 500) {
 
 // ===== SESSION TIMEOUT =====
 let sessionTimeout;
-const SESSION_DURATION = 30 * 60 * 1000;
+let sessionWarningTimeout;
+const SESSION_DURATION = 30 * 60 * 1000; // 30 minutes
+const SESSION_WARNING_TIME = 5 * 60 * 1000; // 5 minutes before expiry
+let isInQuiz = false;
+let lastActivityTime = Date.now();
 
 function resetSessionTimer() {
+    lastActivityTime = Date.now();
+    
+    // Don't reset timer if user is in quiz or uploading
+    if (isInQuiz || document.querySelector('.loading')) {
+        return;
+    }
+    
     clearTimeout(sessionTimeout);
+    clearTimeout(sessionWarningTimeout);
+    
     if (currentUser) {
+        // Warning timeout (25 minutes)
+        sessionWarningTimeout = setTimeout(() => {
+            if (!isInQuiz) {
+                showAlert('Your session will expire in 5 minutes. Please save your work.', 'warning', 6000);
+            }
+        }, SESSION_DURATION - SESSION_WARNING_TIME);
+        
+        // Logout timeout (30 minutes)
         sessionTimeout = setTimeout(() => {
-            showAlert('Session expired. Please log in again.', 'error');
-            logout();
+            if (!isInQuiz) {
+                showAlert('Session expired. Please log in again.', 'error');
+                logout();
+            } else {
+                // If in quiz, extend session
+                resetSessionTimer();
+            }
         }, SESSION_DURATION);
     }
 }
 
+// Track activity only when NOT in quiz
 ['mousedown', 'keydown', 'scroll', 'touchstart'].forEach(event => {
-    document.addEventListener(event, resetSessionTimer, { passive: true });
+    document.addEventListener(event, () => {
+        if (!isInQuiz) {
+            resetSessionTimer();
+        }
+    }, { passive: true });
 });
 
 // ===== FIREBASE INITIALIZATION =====
@@ -169,6 +204,10 @@ function showAppPage() {
 }
 
 function showQuizPage() {
+    isInQuiz = true; 
+    clearTimeout(sessionTimeout);
+    clearTimeout(sessionWarningTimeout);
+    
     document.getElementById('authPage').style.display = 'none';
     document.getElementById('authPage').classList.remove('active');
     document.getElementById('appPage').style.display = 'none';
@@ -497,10 +536,54 @@ function showAlert(message, type = 'success', duration = 5000) {
     
     container.appendChild(alert);
     
+    // Animate in
+    requestAnimationFrame(() => {
+        alert.style.opacity = '1';
+    });
+    
     setTimeout(() => {
-        alert.style.animation = 'slideUp 0.3s ease-out';
+        alert.style.animation = 'slideUp 0.3s ease-out forwards';
         setTimeout(() => alert.remove(), 300);
     }, duration);
+}
+
+// loading overlay
+function showLoadingOverlay(message = 'Loading...') {
+    if (document.getElementById('loadingOverlay')) return; 
+    
+    const overlay = document.createElement('div');
+    overlay.id = 'loadingOverlay';
+    overlay.className = 'loading-overlay';
+    overlay.innerHTML = `
+        <div class="loading-overlay-content">
+            <div class="spinner"></div>
+            <p>${message}</p>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+}
+
+function hideLoadingOverlay() {
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) {
+        overlay.style.animation = 'fadeOut 0.3s ease-out';
+        setTimeout(() => overlay.remove(), 300);
+    }
+}
+
+function setButtonLoading(buttonId, isLoading, originalText = '') {
+    const btn = document.getElementById(buttonId);
+    if (!btn) return;
+    
+    if (isLoading) {
+        btn.disabled = true;
+        btn.classList.add('btn-loading');
+        btn.dataset.originalText = originalText || btn.textContent;
+    } else {
+        btn.disabled = false;
+        btn.classList.remove('btn-loading');
+        btn.textContent = btn.dataset.originalText || originalText;
+    }
 }
 
 function showValidationErrors(errors) {
@@ -652,29 +735,28 @@ function handleFileSelect(input) {
     }
 }
 
-const uploadFiles = throttle(async function() {
+function openUploadConfirmation() {
     const fileInput = document.getElementById('fileInput');
     const examDate = document.getElementById('examDate').value;
-    const uploadBtn = document.getElementById('uploadBtn');
-    const mergeOption = document.getElementById('mergeOption').value;
-    
-    // Validation
-    const errors = [];
     
     if (!fileInput.files || fileInput.files.length === 0) {
-        errors.push('Please select at least one file');
+        showAlert('❌ Please select at least one file to upload', 'error', 4000);
+        return;
     }
     
     if (!examDate) {
-        errors.push('Please select an exam date');
-    } else {
-        const selectedDate = new Date(examDate);
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        
-        if (selectedDate < today) {
-            errors.push('Exam date cannot be in the past');
-        }
+        showAlert('📅 Please select an exam date', 'error', 4000);
+        return;
+    }
+    
+    const errors = [];
+    
+    const selectedDate = new Date(examDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    if (selectedDate < today) {
+        errors.push('Exam date cannot be in the past');
     }
     
     // Validate each file
@@ -694,9 +776,42 @@ const uploadFiles = throttle(async function() {
         return;
     }
     
+    // All validation passed - show confirmation modal
+    const confirmFileList = document.getElementById('confirmFileList');
+    confirmFileList.innerHTML = Array.from(fileInput.files).map(file => `
+        <div class="file-item-confirm">
+            <strong>📄 ${file.name}</strong><br>
+            ${(file.size / 1024).toFixed(2)} KB
+        </div>
+    `).join('');
+    
+    const examDateObj = new Date(examDate);
+    const formattedDate = examDateObj.toLocaleDateString('en-US', { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+    });
+    document.getElementById('confirmExamDate').textContent = formattedDate;
+    
+    document.getElementById('uploadConfirmationModal').classList.add('active');
+}
+
+function closeUploadConfirmation() {
+    document.getElementById('uploadConfirmationModal').classList.remove('active');
+}
+
+const proceedWithUpload = throttle(async function() {
+    const fileInput = document.getElementById('fileInput');
+    const examDate = document.getElementById('examDate').value;
+    const uploadBtn = document.getElementById('confirmUploadBtn');
+    const mergeCheckbox = document.getElementById('mergeConfirm');
+    const mergeOption = mergeCheckbox.checked ? 'merge' : 'separate';
+    
     const originalText = uploadBtn.textContent;
     uploadBtn.disabled = true;
     uploadBtn.textContent = 'Uploading...';
+    closeUploadConfirmation();
 
     try {
         if (fileInput.files.length === 1 || mergeOption === 'separate') {
@@ -704,32 +819,41 @@ const uploadFiles = throttle(async function() {
             const totalFiles = fileInput.files.length;
             
             for (let i = 0; i < fileInput.files.length; i++) {
-                uploadBtn.textContent = `Uploading ${i + 1}/${totalFiles}...`;
+                const progress = Math.round(((i) / totalFiles) * 100);
+                uploadBtn.textContent = `⬆ Uploading ${i + 1}/${totalFiles}... ${progress}%`;
+                uploadBtn.style.opacity = (1 - (progress / 100) * 0.3).toString();
                 
                 const formData = new FormData();
                 formData.append('file', fileInput.files[i]);
                 formData.append('examDate', examDate);
 
-                const response = await fetch(`${API_URL}/upload`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${userToken}`
-                    },
-                    body: formData
-                });
+                try {
+                    const response = await fetch(`${API_URL}/upload`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${userToken}`
+                        },
+                        body: formData
+                    });
 
-                const data = await response.json();
-                if (data.success) {
-                    successCount++;
+                    const data = await response.json();
+                    if (data.success) {
+                        successCount++;
+                    }
+                } catch (error) {
+                    console.error('Upload error:', error);
                 }
             }
+            
+            uploadBtn.style.opacity = '1';
             
             if (successCount === fileInput.files.length) {
                 showAlert(`✓ Successfully uploaded ${successCount} file(s)!`, 'success');
             } else {
                 showAlert(`⚠ Uploaded ${successCount} of ${totalFiles} files`, 'warning');
             }
-        } else {
+        }
+        else {
             uploadBtn.textContent = 'Merging and uploading...';
             
             const formData = new FormData();
@@ -774,7 +898,7 @@ const uploadFiles = throttle(async function() {
         uploadBtn.disabled = false;
         uploadBtn.textContent = originalText;
     }
-}, 2000); // 2 second throttle
+}, 2000);
 
 // ===== IMPORT QUIZ =====
 function updateImportExample() {
@@ -934,6 +1058,11 @@ async function loadImportedQuizzes() {
 }
 
 async function loadReviewers() {
+    materialsPageCurrent = 1; // Reset to first page
+    loadMaterialsPage(1);
+}
+
+async function loadMaterialsPage(pageNumber) {
     const listContainer = document.getElementById('reviewersList');
     listContainer.innerHTML = '<div class="loading"><div class="spinner"></div><p class="loading-text">Loading your materials...</p></div>';
 
@@ -958,8 +1087,16 @@ async function loadReviewers() {
             return new Date(b.uploadDate) - new Date(a.uploadDate);
         });
 
+        // Combine and paginate
+        const allMaterials = [...uploadedMaterials, ...importedMaterials];
+        totalMaterialsCount = allMaterials.length;
+
+        const startIndex = (pageNumber - 1) * materialsPageSize;
+        const endIndex = startIndex + materialsPageSize;
+        const paginatedMaterials = allMaterials.slice(startIndex, endIndex);
+
         // Check if we have any materials
-        if (uploadedMaterials.length === 0 && importedMaterials.length === 0) {
+        if (allMaterials.length === 0) {
             listContainer.innerHTML = `
                 <div class="empty-state">
                     <div class="empty-icon">📚</div>
@@ -979,93 +1116,87 @@ async function loadReviewers() {
             return diffDays <= 7 && diffDays >= 0;
         };
 
-        // Build uploaded materials HTML
-        let uploadedHTML = '';
-        if (uploadedMaterials.length > 0) {
-            uploadedHTML = uploadedMaterials.map(reviewer => {
-                const isUrgent = isExamUrgent(reviewer.examDate);
-                return `
+        // Build paginated list HTML
+        let materialsHTML = '';
+        paginatedMaterials.forEach(material => {
+            if (material.fileName) {
+                // Uploaded material
+                const isUrgent = isExamUrgent(material.examDate);
+                materialsHTML += `
                     <div class="material-card">
                         <div class="material-header">
                             <div class="material-icon">📄</div>
                             <div class="material-info">
-                                <h3>${reviewer.fileName}</h3>
-                                <p>💾 ${(reviewer.fileSize / 1024).toFixed(2)} KB • ${reviewer.textLength} characters</p>
+                                <h3>${material.fileName}</h3>
+                                <p>💾 ${(material.fileSize / 1024).toFixed(2)} KB • ${material.textLength} characters</p>
                                 <span class="exam-date-badge ${isUrgent ? 'urgent' : ''}">
-                                    📅 Exam: ${new Date(reviewer.examDate).toLocaleDateString()}
+                                    📅 Exam: ${new Date(material.examDate).toLocaleDateString()}
                                     ${isUrgent ? ' • SOON!' : ''}
                                 </span>
                             </div>
                         </div>
                         <div class="material-actions">
-                            <button class="btn-start" onclick="startQuiz('${reviewer.id}')">Start Quiz</button>
-                            <button class="btn-delete" onclick="deleteReviewer('${reviewer.id}')">Delete</button>
+                            <button class="btn-start" onclick="startQuiz('${material.id}')">Start Quiz</button>
+                            <button class="btn-delete" onclick="deleteReviewer('${material.id}')">Delete</button>
                         </div>
                     </div>
                 `;
-            }).join('');
-        } else {
-            uploadedHTML = `
-                <div class="empty-state" style="padding: 40px 20px;">
-                    <div class="empty-icon" style="font-size: 48px; margin-bottom: 10px;">📄</div>
-                    <h3 style="font-size: 18px; margin-bottom: 5px;">No Uploaded Materials</h3>
-                    <p style="font-size: 14px; color: var(--text-muted);">Upload study files to generate AI quizzes</p>
-                </div>
-            `;
-        }
-
-        // Build imported quizzes HTML
-        let importedHTML = '';
-        if (importedMaterials.length > 0) {
-            importedHTML = importedMaterials.map(quiz => `
-                <div class="material-card">
-                    <div class="material-header">
-                        <div class="material-icon">📚</div>
-                        <div class="material-info">
-                            <h3>${quiz.title}</h3>
-                            <p>📝 ${quiz.type.replace('-', ' ').toUpperCase()} • ${quiz.questions.length} questions</p>
+            } else if (material.title) {
+                // Imported quiz
+                materialsHTML += `
+                    <div class="material-card">
+                        <div class="material-header">
+                            <div class="material-icon">📖</div>
+                            <div class="material-info">
+                                <h3>${material.title}</h3>
+                                <p>📝 ${material.type.replace('-', ' ').toUpperCase()} • ${material.questions.length} questions</p>
+                            </div>
+                        </div>
+                        <div class="material-actions">
+                            <button class="btn-start" onclick="startImportedQuiz('${material.id}')">Start Quiz</button>
+                            <button class="btn-delete" onclick="deleteImportedQuiz('${material.id}')">Delete</button>
                         </div>
                     </div>
-                    <div class="material-actions">
-                        <button class="btn-start" onclick="startImportedQuiz('${quiz.id}')">Start Quiz</button>
-                        <button class="btn-delete" onclick="deleteImportedQuiz('${quiz.id}')">Delete</button>
-                    </div>
-                </div>
-            `).join('');
-        } else {
-            importedHTML = `
-                <div class="empty-state" style="padding: 40px 20px;">
-                    <div class="empty-icon" style="font-size: 48px; margin-bottom: 10px;">📚</div>
-                    <h3 style="font-size: 18px; margin-bottom: 5px;">No Imported Quizzes</h3>
-                    <p style="font-size: 14px; color: var(--text-muted);">Import pre-made quizzes to practice</p>
+                `;
+            }
+        });
+
+        // Build pagination controls
+        const totalPages = Math.ceil(totalMaterialsCount / materialsPageSize);
+        let paginationHTML = '';
+
+        if (totalPages > 1) {
+            paginationHTML = `
+                <div class="pagination-container">
+                    <button 
+                        class="pagination-btn" 
+                        onclick="loadMaterialsPage(${pageNumber - 1})"
+                        ${pageNumber === 1 ? 'disabled' : ''}
+                    >
+                        ← Previous
+                    </button>
+                    <span class="pagination-info">
+                        Page ${pageNumber} of ${totalPages} (${totalMaterialsCount} materials)
+                    </span>
+                    <button 
+                        class="pagination-btn" 
+                        onclick="loadMaterialsPage(${pageNumber + 1})"
+                        ${pageNumber === totalPages ? 'disabled' : ''}
+                    >
+                        Next →
+                    </button>
                 </div>
             `;
         }
 
-        // Combine into two-column layout
         listContainer.innerHTML = `
-            <div class="materials-wrapper">
-                <div class="materials-column">
-                    <div class="materials-column-header">
-                        <div class="materials-column-icon">📄</div>
-                        <h2>Uploaded Materials <span style="color: var(--text-muted); font-weight: 400; font-size: 16px;">(${uploadedMaterials.length})</span></h2>
-                    </div>
-                    <div class="materials-grid">
-                        ${uploadedHTML}
-                    </div>
-                </div>
-                
-                <div class="materials-column">
-                    <div class="materials-column-header">
-                        <div class="materials-column-icon">📚</div>
-                        <h2>Imported Quizzes <span style="color: var(--text-muted); font-weight: 400; font-size: 16px;">(${importedMaterials.length})</span></h2>
-                    </div>
-                    <div class="materials-grid">
-                        ${importedHTML}
-                    </div>
-                </div>
+            <div class="materials-list">
+                ${materialsHTML}
             </div>
+            ${paginationHTML}
         `;
+
+        materialsPageCurrent = pageNumber;
 
     } catch (error) {
         listContainer.innerHTML = '<div class="empty-state"><p style="color: var(--error);">Failed to load materials</p></div>';
@@ -1283,8 +1414,8 @@ async function startLearnMode() {
 
 function renderLearnMode() {
     const quizContent = document.getElementById('quizContent');
-    
-    quizContent.innerHTML = `
+        
+        quizContent.innerHTML = `
         <div id="learnChatContainer" class="chat">
             <div class="chat-title">
                 <h1>Learn Mode</h1>
@@ -1851,15 +1982,20 @@ function displayQuestions(questionsText, questionTypes) {
         i++;
     }
     
-    // Display results or error
     if (html) {
         quizContent.innerHTML = html;
-        console.log(`✅ Successfully parsed ${questionNum - 1} questions`);
+        
+        const cards = quizContent.querySelectorAll('.question-card');
+        cards.forEach((card, index) => {
+            card.style.animation = `slideInFromLeft 0.4s ease-out ${index * 0.1}s both`;
+        });
+        
+        console.log(`✓ Successfully parsed ${questionNum - 1} questions`);
     } else {
         quizContent.innerHTML = `
             <div style="text-align: center; padding: 40px;">
                 <p style="color: var(--error); font-size: 18px; margin-bottom: 20px;">
-                    ⚠️ Could not parse questions from AI response
+                    ⚠ Could not parse questions from AI response
                 </p>
                 <p style="color: var(--text-muted); margin-bottom: 20px;">
                     The AI generated text in an unexpected format. Try regenerating the quiz.
@@ -2404,18 +2540,67 @@ async function deleteReviewer(reviewerId) {
 }
 
 function exitQuiz() {
+    isInQuiz = false; 
+    resetSessionTimer(); 
+    
     showAppPage();
     document.querySelector('[data-page="materials"]').click();
     document.getElementById('submitBtn').style.display = 'block';
     currentReviewerId = null;
     quizSubmitted = false;
     
-    // Remove chatbot if exists
+    // bye chatbot
     const chatbot = document.getElementById('chatbotContainer');
     if (chatbot) {
         chatbot.remove();
     }
 }
+
+// ===== SERVICE WORKER REGISTRATION (Offline Support) =====
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then((registration) => {
+        console.log('Service Worker registered successfully:', registration);
+      })
+      .catch((error) => {
+        console.log('Service Worker registration failed:', error);
+      });
+  });
+
+  window.addEventListener('online', () => {
+    showAlert('You are back online!', 'success', 3000);
+  });
+
+  window.addEventListener('offline', () => {
+    showAlert('You are offline. Some features may not work.', 'warning', 5000);
+  });
+}
+
+function updateOnlineStatus() {
+    const isOnline = navigator.onLine;
+    const appPage = document.getElementById('appPage');
+    
+    if (!isOnline) {
+        if (!document.getElementById('offlineIndicator')) {
+            const offlineBar = document.createElement('div');
+            offlineBar.id = 'offlineIndicator';
+            offlineBar.className = 'offline-indicator';
+            offlineBar.innerHTML = '⚠ Offline - Limited functionality available';
+            appPage.insertBefore(offlineBar, appPage.firstChild);
+        }
+    } else {
+        const indicator = document.getElementById('offlineIndicator');
+        if (indicator) {
+            indicator.remove();
+        }
+    }
+}
+
+// Check online status on page load
+document.addEventListener('DOMContentLoaded', updateOnlineStatus);
+window.addEventListener('online', updateOnlineStatus);
+window.addEventListener('offline', updateOnlineStatus);
 
 // ===== MOBILE MENU FUNCTIONS =====
 function toggleMobileMenu() {
