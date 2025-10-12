@@ -248,7 +248,7 @@ Study material: ${shortText}
 
 Generate now:`,
 
-'matching': `Generate EXACTLY ${questionsForThisType} matching pairs.
+'matching': `Generate EXACTLY ${count} matching pairs.
 
 FORMAT (MANDATORY - MUST INCLUDE HEADER):
 Column A | Column B
@@ -258,8 +258,6 @@ term3 | definition3
 
 CRITICAL: Always start with "Column A | Column B" header line first, then list pairs below.
 Do not skip the header.
-
-Generate now:
 
 Study material: ${shortText}
 
