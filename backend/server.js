@@ -19,9 +19,7 @@ const learnRoute = require('./routes/learn');
 const app = express();
 
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? 'https://your-frontend-domain.com' 
-    : '*',
+  origin: process.env.FRONTEND_URL || '*', 
   methods: ['GET', 'POST', 'DELETE', 'PUT'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
