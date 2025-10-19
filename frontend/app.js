@@ -1366,20 +1366,18 @@ function toggleQuizType(button) {
         document.querySelectorAll('.quiz-type-btn').forEach(btn => {
             btn.classList.remove('selected');
         });
-        // Select only flashcard
+  
         button.classList.add('selected');
         selectedQuizTypes = ['flashcard'];
     }
-    // If flashcard is already selected and user clicks another type
     else if (selectedQuizTypes.includes('flashcard')) {
-        // Remove flashcard
+
         selectedQuizTypes = selectedQuizTypes.filter(t => t !== 'flashcard');
         document.querySelector('.quiz-type-btn[data-type="flashcard"]').classList.remove('selected');
-        // Add the new type
+
         button.classList.add('selected');
         selectedQuizTypes.push(type);
     }
-    // Normal toggle behavior
     else {
         if (button.classList.contains('selected')) {
             button.classList.remove('selected');
@@ -1390,17 +1388,9 @@ function toggleQuizType(button) {
         }
     }
     
-    // Update counter
     const quizTypesContainer = document.querySelector('.quiz-types');
     quizTypesContainer.setAttribute('data-selected', selectedQuizTypes.length);
     
-    // Show/hide True/False dropdown
-    const modalTrueFalseGroup = document.getElementById('modalTrueFalseGroup');
-    if (selectedQuizTypes.includes('true-false')) {
-        modalTrueFalseGroup.style.display = 'block';
-    } else {
-        modalTrueFalseGroup.style.display = 'none';
-    }
 }
 
 // ===== START QUIZ =====
@@ -1592,17 +1582,18 @@ function startQuiz(reviewerId) {
         });
     });
     
-    // Reset counter
     const quizTypesContainer = document.querySelector('.quiz-types');
     quizTypesContainer.setAttribute('data-selected', '0');
     
     document.getElementById('questionCount').value = '10';
     document.getElementById('specialInstructions').value = '';
     
-    // Hide True/False dropdown by default
     const modalTrueFalseGroup = document.getElementById('modalTrueFalseGroup');
     if (modalTrueFalseGroup) {
-        modalTrueFalseGroup.style.display = 'none';
+        const dropdown = document.getElementById('modalTrueFalseType');
+        if (dropdown) {
+            dropdown.value = 'traditional';
+        }
     }
     
     openModal();
@@ -1636,25 +1627,22 @@ const generateWithSettings = throttle(async function() {
         return;
     }
     
-    showAlert('🔄 Generating your quiz...', 'info', 3000);
+    showAlert('ðŸ"„ Generating your quiz...', 'info', 3000);
     
     const instructions = document.getElementById('specialInstructions').value.trim();
     
-    let trueFalseVariant = 'traditional';
-    
-    if (selectedQuizTypes.includes('true-false')) {
-        trueFalseVariant = document.getElementById('modalTrueFalseType').value;
-    }
-    
     const typesToGenerate = [...selectedQuizTypes];
+    
+    console.log('✅ Types to generate:', typesToGenerate);
     
     const requestBody = {
         reviewerId: currentReviewerId,
         questionTypes: typesToGenerate,
         count: parseInt(count),
-        specialInstructions: instructions,
-        trueFalseVariant: trueFalseVariant
+        specialInstructions: instructions
     };
+    
+    console.log('Request body being sent:', requestBody);
     
     closeModal();
     showQuizPage();
@@ -1680,7 +1668,7 @@ const generateWithSettings = throttle(async function() {
         if (data.success) {
             quizTitle.textContent = `Mixed Quiz (${typesToGenerate.join(', ')})`;
             displayQuestions(data.questions, typesToGenerate);
-            showAlert('✓ Quiz generated successfully!', 'success');
+            showAlert('✔ Quiz generated successfully!', 'success');
         } else {
             quizContent.innerHTML = `<p style="color: var(--error); text-align: center;">Failed to generate questions: ${data.error}</p>`;
             showAlert('Failed to generate quiz', 'error');
@@ -1842,14 +1830,64 @@ function displayQuestions(questionsText, questionTypes) {
             }
         }
         
-        // ==========================================
         // PRIORITY 3: TRUE/FALSE
-        // ==========================================
         else if (line.startsWith('Statement:')) {
             const statement = line.substring(10).trim();
-            const answerLine = lines[i + 1];
             
-            // Check if it's True/False (has Answer: immediately after Statement:)
+            const nextLine = lines[i + 1];
+            if (nextLine && nextLine.trim().startsWith('I.')) {
+                const statementI = lines[i + 1].substring(2).trim();
+                const statementII = lines[i + 2] && lines[i + 2].startsWith('II.') ? lines[i + 2].substring(3).trim() : '';
+                
+                let options = [];
+                let correctAnswer = '';
+                let answerLineIndex = -1;
+                
+                for (let j = i + 3; j < Math.min(i + 10, lines.length); j++) {
+                    const optLine = lines[j].trim();
+                    if (optLine.match(/^[A-D]\)/)) {
+                        options.push(optLine);
+                    }
+                    if (optLine.startsWith('Answer:') || optLine.startsWith('Correct:')) {
+                        correctAnswer = optLine.split(':')[1].trim();
+                        answerLineIndex = j;
+                        break;
+                    }
+                }
+                
+                if (statementII && options.length === 4 && correctAnswer && answerLineIndex !== -1) {
+                    currentQuestions.push({
+                        statement: statement,
+                        statementI: statementI,
+                        statementII: statementII,
+                        options: options,
+                        correctAnswer: correctAnswer,
+                        type: 'conditional-true-false'
+                    });
+                    
+                    html += `
+                        <div class="question-card conditional-tf-card">
+                            <span class="question-number">Conditional ${questionNum}</span>
+                            <div class="question-text"><strong>${statement}</strong></div>
+                            <div class="conditional-statements">
+                                <div class="statement-item"><strong>I.</strong> ${statementI}</div>
+                                <div class="statement-item"><strong>II.</strong> ${statementII}</div>
+                            </div>
+                            ${options.map(opt => `
+                                <div class="option" onclick="selectOption(this, ${questionNum})">${opt}</div>
+                            `).join('')}
+                            <div class="explanation" id="explain-${questionNum}">
+                                <strong>Correct Answer:</strong> ${correctAnswer}
+                            </div>
+                        </div>
+                    `;
+                    questionNum++;
+                    i = answerLineIndex + 1;
+                    continue;
+                }
+            }
+            
+            const answerLine = lines[i + 1];
             if (answerLine && answerLine.startsWith('Answer:')) {
                 const answer = answerLine.substring(7).trim();
                 const explanationLine = lines[i + 2];

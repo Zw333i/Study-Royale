@@ -1713,6 +1713,49 @@ input:checked + .slider:before {
     cursor: default;
 }
 
+/* Add this to your styles.css file for conditional true/false styling */
+
+.conditional-tf-card {
+    border-left: 4px solid #9333ea;
+}
+
+.conditional-statements {
+    background: rgba(147, 51, 234, 0.1);
+    border-radius: 8px;
+    padding: 16px;
+    margin: 16px 0;
+}
+
+.statement-item {
+    padding: 12px;
+    margin: 8px 0;
+    background: var(--card-bg);
+    border-radius: 6px;
+    border-left: 3px solid #9333ea;
+    font-size: 15px;
+    line-height: 1.6;
+}
+
+.statement-item strong {
+    color: #9333ea;
+    margin-right: 8px;
+}
+
+.conditional-tf-card .question-text {
+    font-size: 17px;
+    font-weight: 600;
+    color: #9333ea;
+    margin-bottom: 8px;
+}
+
+body.light-mode .conditional-statements {
+    background: rgba(147, 51, 234, 0.08);
+}
+
+body.light-mode .statement-item {
+    background: rgba(147, 51, 234, 0.05);
+}
+
 /* ===== RESULTS ===== */
 .results-summary {
     background: linear-gradient(135deg, var(--navy), var(--blue));

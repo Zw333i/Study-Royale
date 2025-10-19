@@ -26,32 +26,35 @@ const validatorAI = new OpenAI({
   }
 });
 
-// COMPLETELY REWRITTEN - Replace entire generateQuestions function
-async function generateQuestions(text, questionTypes, count = 10, specialInstructions = '', questionsData = {}) {
+// KEY CHANGES:
+// 1. Map 'true-false' -> 'conditional-true-false' when variant is conditional
+// 2. Add 'conditional-true-false' to questionCounts
+// 3. Pass questionsData through validation so it knows the variant
+
+async function generateQuestions(text, questionTypes, count = 10, specialInstructions = '') {
   let attempt = 0;
   const maxAttempts = 2;
   
   while (attempt < maxAttempts) {
     attempt++;
-    console.log(`\n🔄 ===== ATTEMPT ${attempt}/${maxAttempts} =====`);
-    console.log(`🎯 Target: ${count} questions total`);
-    console.log(`📝 Types: ${questionTypes.join(', ')}`);
+    console.log(`\n ===== ATTEMPT ${attempt}/${maxAttempts} =====`);
+    console.log(`Target: ${count} questions total`);
+    console.log(`📋 Types: ${questionTypes.join(', ')}`);
     
-    // STEP 1: Generate each question type SEPARATELY instead of all at once
-    console.log('\n🤖 STEP 1: GROQ generating questions by type (SEPARATE GENERATION)...');
+    console.log('\nSTEP 1: GROQ generating questions by type (SEPARATE GENERATION)...');
     
     let allQuestions = '';
     const typesToGenerate = Array.isArray(questionTypes) ? questionTypes : [questionTypes];
     const questionsPerType = Math.floor(count / typesToGenerate.length);
     const remainder = count % typesToGenerate.length;
-    
+
     for (let typeIndex = 0; typeIndex < typesToGenerate.length; typeIndex++) {
       const type = typesToGenerate[typeIndex];
       const questionsForThisType = questionsPerType + (typeIndex < remainder ? 1 : 0);
       
-      console.log(`  ➜ Generating ${questionsForThisType} ${type} questions...`);
+      console.log(`Generating ${questionsForThisType} ${type} questions...`);
       
-      const singleTypePrompt = buildSingleTypePrompt(text, type, questionsForThisType, specialInstructions, questionsData);
+      const singleTypePrompt = buildSingleTypePrompt(text, type, questionsForThisType, specialInstructions);
       
       try {
         const completion = await primaryAI.chat.completions.create({
@@ -74,23 +77,21 @@ async function generateQuestions(text, questionTypes, count = 10, specialInstruc
         typeQuestions = typeQuestions.trim();
         
         allQuestions += typeQuestions + '\n\n';
-        console.log(`  ✅ Generated ${questionsForThisType} ${type} questions`);
+        console.log(`  âœ… Generated ${questionsForThisType} ${type} questions`);
         
       } catch (error) {
-        console.error(`  ❌ Error generating ${type}:`, error.message);
+        console.error(`  âŒ Error generating ${type}:`, error.message);
         if (attempt === maxAttempts) {
           throw error;
         }
       }
     }
     
-    // STEP 2: Validate what Groq generated
-    console.log('\n📊 STEP 2: Validating Groq output...');
+    console.log('\nðŸ"Š STEP 2: Validating Groq output...');
     const initialValidation = await validateAndFixQuestions(allQuestions, typesToGenerate, count);
-    console.log('📈 Groq generated:', initialValidation.counts);
+    console.log('Groq generated:', initialValidation.counts);
     
-    // STEP 3: If missing questions, use Gemini to fill ONLY the gaps
-    console.log('\n🛠️  STEP 3: Checking for missing questions...');
+    console.log('\nSTEP 3: Checking for missing questions...');
     const missingByType = [];
     
     for (let i = 0; i < typesToGenerate.length; i++) {
@@ -100,17 +101,16 @@ async function generateQuestions(text, questionTypes, count = 10, specialInstruc
       const diff = expected - actual;
       
       if (diff > 0) {
-        missingByType.push({ type, needed: diff, expected, actual });
-        console.log(`  ⚠️  Missing ${diff} ${type} questions (have ${actual}, need ${expected})`);
+        missingByType.push({ type: type, needed: diff, expected, actual });
+        console.log(`  ⚠️ Missing ${diff} ${type} questions (have ${actual}, need ${expected})`);
       }
     }
     
-    // If we have missing questions, use Gemini to generate ONLY those
     if (missingByType.length > 0) {
-      console.log('\n🤖 STEP 3b: GEMINI generating missing questions...');
+      console.log('\nðŸ¤– STEP 3b: GEMINI generating missing questions...');
       
       for (const missing of missingByType) {
-        console.log(`  ➜ Gemini generating ${missing.needed} missing ${missing.type} questions...`);
+        console.log(`  âžœ Gemini generating ${missing.needed} missing ${missing.type} questions...`);
         
         const geminiPrompt = buildGeminiPrompt(text, missing.type, missing.needed);
         
@@ -135,43 +135,263 @@ async function generateQuestions(text, questionTypes, count = 10, specialInstruc
           newQuestions = newQuestions.replace(/^(Case Study|Multiple Choice|True\/False|Identification|Odd One Out|Enumeration|Matching|Association|Flashcard|Fill|Except).*?\n/gim, '');
           newQuestions = newQuestions.trim();
           
-          console.log(`  ✅ Gemini generated ${missing.needed} ${missing.type} questions`);
+          console.log(`  âœ… Gemini generated ${missing.needed} ${missing.type} questions`);
           allQuestions += '\n\n' + newQuestions + '\n\n';
           
         } catch (error) {
-          console.error(`  ❌ Gemini generation failed for ${missing.type}:`, error.message);
+          console.error(`  âŒ Gemini generation failed for ${missing.type}:`, error.message);
         }
       }
     }
     
-    // STEP 4: Final validation
-    console.log('\n✅ STEP 4: Final validation...');
+    // validation
+    console.log('\nâœ… STEP 4: Final validation...');
     const finalValidation = await validateAndFixQuestions(allQuestions, typesToGenerate, count);
-    console.log('📊 Final counts:', finalValidation.counts);
+    console.log('Final counts:', finalValidation.counts);
     
     if (finalValidation.isValid) {
-      console.log('🎉 SUCCESS! All questions validated.');
-      console.log(`📝 Total generated: ${Object.values(finalValidation.counts).reduce((a, b) => a + b, 0)} questions`);
+      console.log('SUCCESS! All questions validated.');
+      console.log(`Total generated: ${Object.values(finalValidation.counts).reduce((a, b) => a + b, 0)} questions`);
       return allQuestions;
     } else {
-      console.warn(`⚠️  Validation has issues:`, finalValidation.issues);
+      console.warn(`âš ï¸  Validation has issues:`, finalValidation.issues);
       
       if (attempt === maxAttempts) {
-        console.log('📋 Max attempts reached. Returning best effort result.');
+        console.log('ðŸ"‹ Max attempts reached. Returning best effort result.');
         return allQuestions;
       }
       
-      console.log('🔄 Retrying with stronger instructions...');
+      console.log('ðŸ"„ Retrying with stronger instructions...');
       continue;
     }
   }
 }
 
-// NEW: Generate single question type at a time
-function buildSingleTypePrompt(text, questionType, count, specialInstructions = '', questionsData = {}) {
+// Validate and count questions - NOW TAKES questionsData
+async function validateAndFixQuestions(text, expectedTypes, expectedCount) {
+  const lines = text.split('\n').filter(line => line.trim());
+  
+  const questionCounts = {
+    'case-study': 0,
+    'multiple-choice': 0,
+    'true-false': 0,
+    'conditional-true-false': 0,  
+    'association': 0,
+    'identification': 0,
+    'enumeration': 0,
+    'matching': 0,
+    'flashcard': 0,
+    'fill-blank': 0,
+    'odd-one-out': 0,
+    'except-questions': 0
+  };
+  
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    
+    // Count case studies (NEW FORMAT)
+    if (line.startsWith('Scenario:')) {
+      const questionLine = lines[i + 1];
+      const answerLine = lines[i + 2];
+      if (questionLine && questionLine.startsWith('Question:') && 
+          answerLine && answerLine.startsWith('ModelAnswer:')) {
+        questionCounts['case-study']++;
+        i += 3;
+        continue;
+      }
+    }
+    
+    // Count case studies (OLD FORMAT)
+    if (line.startsWith('Case:')) {
+      questionCounts['case-study']++;
+      i++;
+      continue;
+    }
+    
+    // PRIORITY: Check for CONDITIONAL TRUE/FALSE FIRST (before regular association)
+    if (line.startsWith('Statement:') && lines[i + 1]?.startsWith('I.')) {
+      const hasII = lines[i + 2]?.startsWith('II.');
+      const hasOptions = lines.slice(i + 3, i + 7).some(l => l.match(/^[A-D]\)/));
+      
+      if (hasII && hasOptions) {
+        console.log(`  ðŸ"Š Found conditional true/false at line ${i}`);
+        questionCounts['conditional-true-false']++;
+        i += 7;
+        continue;
+      }
+    }
+    
+    // Count associations (if no Answer: line immediately after Statement:)
+    if (line.startsWith('Statement:') && !lines[i + 1]?.startsWith('Answer:')) {
+      const hasRomanNumerals = lines[i + 1]?.startsWith('I.') && lines[i + 2]?.startsWith('II.');
+      if (hasRomanNumerals) {
+        console.log(`  ðŸ"Š Found association at line ${i}`);
+        questionCounts['association']++;
+        i += 7;
+        continue;
+      }
+    }
+
+    // Count SIMPLE TRUE/FALSE (Statement + Answer line)
+    if (line.startsWith('Statement:') && lines[i + 1]?.startsWith('Answer:')) {
+      console.log(`  ðŸ"Š Found simple true/false at line ${i}`);
+      questionCounts['true-false']++;
+      i += 2;
+      continue;
+    }
+        
+    if (line.startsWith('Column A |')) {
+        questionCounts['matching']++;
+        i++;
+        continue;
+    } else if (line.includes(' | ') && !line.startsWith('Q:') && !line.startsWith('A)') && 
+              !line.startsWith('Statement:') && !line.startsWith('Scenario:')) {
+        questionCounts['matching']++;
+        i++;
+        continue;
+    }
+    
+    // Count flashcards
+    if (line.startsWith('Front:')) {
+      questionCounts['flashcard']++;
+      i += 2;
+      continue;
+    }
+    
+    // Count odd-one-out (BEFORE generic Q:)
+    if (line.startsWith('Q: Which is the odd one out?')) {
+      questionCounts['odd-one-out']++;
+      i += 6;
+      continue;
+    }
+    
+    // Count except-questions
+    if (line.includes('EXCEPT:')) {
+      questionCounts['except-questions']++;
+      i += 6;
+      continue;
+    }
+    
+    // Count multiple choice
+    if (line.startsWith('Q:')) {
+      const nextFewLines = lines.slice(i + 1, i + 6).join('\n');
+      const hasOptions = nextFewLines.match(/^[A-D]\)/m);
+      const hasCorrect = nextFewLines.includes('Correct:');
+      
+      if (hasOptions && hasCorrect) {
+        questionCounts['multiple-choice']++;
+        i += 6;
+        continue;
+      } else {
+        // Identification or enumeration
+        const answerLine = lines[i + 1];
+        if (answerLine && answerLine.startsWith('A:')) {
+        const answer = answerLine.substring(2).trim();
+        const isEnumeration = answer.match(/^\d+\.\s/) || 
+                              (answer.includes(',') && answer.split(',').length >= 2);
+        if (isEnumeration) {
+            questionCounts['enumeration']++;
+        } else {
+            questionCounts['identification']++;
+        }
+          i += 2;
+          continue;
+        }
+      }
+    }
+    
+    i++;
+  }
+  
+  // Show validation breakdown
+  const typesArray = Array.isArray(expectedTypes) ? expectedTypes : [expectedTypes];
+  const questionsPerType = Math.floor(expectedCount / typesArray.length);
+
+  console.log('VALIDATION BREAKDOWN:');
+  const issues = [];
+  
+  typesArray.forEach((type, idx) => {
+    const expected = questionsPerType + (idx < (expectedCount % typesArray.length) ? 1 : 0);
+    const actual = questionCounts[type] || 0;
+    const status = actual === expected ? '✅' : (actual === 0 ? '❌ MISSING' : `⚠️  ${actual}/${expected}`);
+    console.log(`  ${type}: ${status}`);
+    
+    if (actual === 0) {
+      issues.push(`Missing all ${type} questions (expected ${expected})`);
+    } else if (actual !== expected) {
+      issues.push(`${type}: got ${actual}, expected ${expected}`);
+    }
+  });
+  
+  return {
+    isValid: issues.length === 0,
+    issues: issues,
+    counts: questionCounts
+  };
+}
+
+function buildSingleTypePrompt(text, questionType, count, specialInstructions = '') {
   const shortText = text.substring(0, 3000);
   
   const prompts = {
+    'conditional-true-false': `Generate EXACTLY ${count} CONDITIONAL true/false questions.
+
+⚠️ CRITICAL: This is a TWO-STATEMENT LOGIC format!
+
+FORMAT (MANDATORY - NO NUMBERING):
+Statement: [main topic/question]
+I. [first statement about the topic]
+II. [second statement about the topic]
+A) If "I" is true but "II" is false
+B) If "II" is true but "I" is false
+C) Both are true
+D) Neither are true
+Answer: [A/B/C/D]
+
+EXAMPLES OF CORRECT FORMAT:
+
+Statement: Static Routing Advantages
+I. Provides added security with no route advertisements
+II. Adapts automatically to topology changes
+A) If "I" is true but "II" is false
+B) If "II" is true but "I" is false
+C) Both are true
+D) Neither are true
+Answer: A
+
+Statement: RIP Protocol Characteristics
+I. Uses hop count as metric
+II. Maximum hop count is 15
+A) If "I" is true but "II" is false
+B) If "II" is true but "I" is false
+C) Both are true
+D) Neither are true
+Answer: C
+
+Study material: ${shortText}
+
+Generate ${count} questions now:`,
+
+    'true-false': `Generate EXACTLY ${count} TRADITIONAL true/false questions.
+
+FORMAT (MANDATORY - NO NUMBERING):
+Statement: [simple declarative statement]
+Answer: [True/False]
+Explanation: [brief]
+
+EXAMPLES:
+Statement: Static routing requires manual configuration.
+Answer: True
+Explanation: Routes must be manually entered by the administrator.
+
+Statement: RIP can handle unlimited hops.
+Answer: False
+Explanation: RIP has a maximum hop count of 15.
+
+Study material: ${shortText}
+
+Generate ${count} questions now:`,
     'fill-blank': `Generate EXACTLY ${count} fill-in-the-blank questions.
 
 FORMAT (MANDATORY - NO NUMBERING):
@@ -206,28 +426,6 @@ Study material: ${shortText}
 
 Generate now:`,
 
-    'true-false': questionsData.trueFalseVariant === 'conditional'
-      ? `Generate EXACTLY ${count} conditional true/false questions.
-
-FORMAT (MANDATORY - NO NUMBERING):
-Statement: If [condition 1] is true, then [condition 2] is:
-Answer: [True/False/Cannot be determined]
-Explanation: [brief]
-
-Study material: ${shortText}
-
-Generate now:`
-      : `Generate EXACTLY ${count} true/false questions.
-
-FORMAT (MANDATORY - NO NUMBERING):
-Statement: [statement]
-Answer: [True/False]
-Explanation: [brief]
-
-Study material: ${shortText}
-
-Generate now:`,
-
     'flashcard': `Generate EXACTLY ${count} flashcards.
 
 FORMAT (MANDATORY - NO NUMBERING):
@@ -248,7 +446,7 @@ Study material: ${shortText}
 
 Generate now:`,
 
-'matching': `Generate EXACTLY ${count} matching pairs.
+    'matching': `Generate EXACTLY ${count} matching pairs.
 
 FORMAT (MANDATORY - MUST INCLUDE HEADER):
 Column A | Column B
@@ -411,10 +609,26 @@ SECTION ${index + 1}: TRUE/FALSE CONDITIONAL (${questionsForThisType} QUESTIONS)
 
 Create EXACTLY ${questionsForThisType} conditional true/false questions.
 
-FORMAT (MANDATORY):
-Statement: If [statement 1] is true, then [statement 2] is:
-Answer: [True/False/Cannot be determined]
-Explanation: [brief explanation]`
+FORMAT (MANDATORY - NO NUMBERING):
+Statement: [main topic/question]
+I. [first statement about the topic]
+II. [second statement about the topic]
+A) If "I" is true but "II" is false
+B) If "II" is true but "I" is false
+C) Both are true
+D) Neither are true
+Answer: [A/B/C/D]
+
+EXAMPLES OF CORRECT FORMAT:
+
+Statement: Characteristics of Static Routing
+I. Routes are manually configured by the administrator
+II. Routes automatically adapt to network changes
+A) If "I" is true but "II" is false
+B) If "II" is true but "I" is false
+C) Both are true
+D) Neither are true
+Answer: A`
           : `
 ═══════════════════════════════════════════════════
 SECTION ${index + 1}: TRUE/FALSE (${questionsForThisType} QUESTIONS)
@@ -592,6 +806,7 @@ async function validateAndFixQuestions(text, expectedTypes, expectedCount) {
     'case-study': 0,
     'multiple-choice': 0,
     'true-false': 0,
+    'conditional-true-false': 0,  
     'association': 0,
     'identification': 0,
     'enumeration': 0,
@@ -635,13 +850,23 @@ async function validateAndFixQuestions(text, expectedTypes, expectedCount) {
       }
     }
     
-    // Count True/False
+    if (line.startsWith('Statement:') && lines[i + 1]?.startsWith('I.')) {
+      const hasII = lines[i + 2]?.startsWith('II.');
+      const hasOptions = lines.slice(i + 3, i + 7).some(l => l.match(/^[A-D]\)/));
+      
+      if (hasII && hasOptions) {
+        questionCounts['conditional-true-false']++;
+        i += 7;
+        continue;
+      }
+    }
+
     if (line.startsWith('Statement:') && lines[i + 1]?.startsWith('Answer:')) {
       questionCounts['true-false']++;
       i += 2;
       continue;
     }
-    
+        
     if (line.startsWith('Column A |')) {
         questionCounts['matching']++;
         i++;
@@ -847,6 +1072,34 @@ Repeat ${count} times.
 
 Material: ${shortText}`,
 
+        'conditional-true-false': `Generate EXACTLY ${count} CONDITIONAL true/false questions.
+
+⚠️ CRITICAL: This is a TWO-STATEMENT LOGIC format!
+
+FORMAT (MANDATORY - NO NUMBERING):
+Statement: [main topic/question]
+I. [first statement about the topic]
+II. [second statement about the topic]
+A) If "I" is true but "II" is false
+B) If "II" is true but "I" is false
+C) Both are true
+D) Neither are true
+Answer: [A/B/C/D]
+
+EXAMPLE:
+Statement: Static Routing Advantages
+I. Provides added security with no route advertisements
+II. Adapts automatically to topology changes
+A) If "I" is true but "II" is false
+B) If "II" is true but "I" is false
+C) Both are true
+D) Neither are true
+Answer: A
+
+Repeat ${count} times with different topics.
+
+Material: ${shortText}`,
+
     'odd-one-out': `Generate EXACTLY ${count} odd one out questions. Use only this format with NO numbering:
 
 Q: Which is the odd one out?
@@ -1004,7 +1257,7 @@ async function checkAnswerWithAI(userAnswer, correctAnswer, questionText) {
 // API Routes
 router.post('/', verifyToken, async (req, res) => {
   try {
-    const { reviewerId, questionTypes, questionType, count, specialInstructions, associationType } = req.body;
+    const { reviewerId, questionTypes, questionType, count, specialInstructions } = req.body;
 
     let types = questionTypes || (questionType ? [questionType] : null);
     
@@ -1031,20 +1284,16 @@ router.post('/', verifyToken, async (req, res) => {
 
     const extractedText = reviewerData.textExtracted;
 
-    console.log(`\n📝 Generating questions for types: ${JSON.stringify(types)}`);
+    console.log(`\n🔍 Generating questions for types: ${JSON.stringify(types)}`);
     if (specialInstructions) {
       console.log(`🎯 Special instructions: ${specialInstructions}`);
-    }
+    };
     
     const questions = await generateQuestions(
       extractedText, 
       types,
       count || 10,
-      specialInstructions || '',
-      {
-        associationType: req.body.associationType || 'real-association',
-        trueFalseVariant: req.body.trueFalseVariant || 'traditional'
-      }
+      specialInstructions || ''
     );
 
     res.json({

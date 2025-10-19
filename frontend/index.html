@@ -421,6 +421,10 @@ Answer: B
                         <span class="type-icon">✓</span>
                         <span>True or False</span>
                     </button>
+                    <button type="button" class="quiz-type-btn" data-type="conditional-true-false">
+                        <span class="type-icon">✓</span>
+                        <span>Conditional T/F</span>
+                    </button>
                     <button type="button" class="quiz-type-btn" data-type="association">
                         <span class="type-icon">🔗</span>
                         <span>Association</span>
@@ -455,17 +459,6 @@ Answer: B
                 <div class="form-group">
                     <label>Number of Questions</label>
                     <input type="number" id="questionCount" class="form-control" value="10" min="1" max="50">
-                </div>
-
-                <div class="form-group" id="modalTrueFalseGroup" style="display: none;">
-                    <label>True/False Variant</label>
-                    <select id="modalTrueFalseType" class="form-control">
-                        <option value="traditional">Traditional (True/False)</option>
-                        <option value="conditional">Conditional (If statement 1 is true...)</option>
-                    </select>
-                    <small class="helper-text">
-                        <strong>Conditional format:</strong> If statement 1 is true, then statement 2 is: (True/False/Cannot be determined)
-                    </small>
                 </div>
 
                 <div class="form-group">
