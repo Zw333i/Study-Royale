@@ -2,7 +2,7 @@
 // This file handles API URL for different environments
 const CONFIG = {
     // Production API URL - UPDATE THIS after deploying to Render
-    PRODUCTION_API_URL: 'https://study-royale-backend.onrender.com/api',
+    PRODUCTION_API_URL: 'https://studyroyale-backend.onrender.com/api',
     
     // Development API URL
     DEVELOPMENT_API_URL: 'http://localhost:3000/api',
