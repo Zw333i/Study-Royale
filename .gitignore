@@ -14,6 +14,9 @@ serviceAccountKey.json
 firebase-debug.log
 .firebase/
 
+# Deployment hooks (sensitive)
+RENDER_DEPLOY_HOOK.md
+
 # Uploads (keep folder but ignore contents)
 backend/uploads/*
 !backend/uploads/.gitkeep
@@ -58,5 +61,6 @@ KEEP_ALIVE_GUIDE.md
 README.md
 START_HERE.md
 VERCEL_RENDER_SETUP.md
+RENDER_DEPLOY_HOOK.md
 
 render.yaml
