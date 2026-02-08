@@ -1,0 +1,52 @@
+name: Keep Backend Awake
+
+on:
+  schedule:
+    # Run every 14 minutes to prevent Render free tier from sleeping
+    # Cron format: minute hour day month weekday
+    - cron: '*/14 * * * *'
+  
+  # Allow manual trigger from Actions tab
+  workflow_dispatch:
+    inputs:
+      trigger_deploy:
+        description: 'Trigger Render deployment'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  ping-backend:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Ping Backend Health Endpoint
+        run: |
+          echo "Pinging backend at $(date)"
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://study-royale-backend.onrender.com/health)
+          
+          if [ $response -eq 200 ]; then
+            echo "✅ Backend is awake and healthy (HTTP $response)"
+          else
+            echo "⚠️ Backend returned HTTP $response"
+            exit 1
+          fi
+      
+      - name: Log Success
+        if: success()
+        run: echo "Backend ping successful at $(date)"
+      
+      - name: Log Failure
+        if: failure()
+        run: echo "⚠️ Backend ping failed - check Render deployment"
+      
+      - name: Trigger Render Deployment
+        if: github.event.inputs.trigger_deploy == 'true'
+        run: |
+          echo "🚀 Triggering Render deployment..."
+          curl -X POST https://api.render.com/deploy/srv-d643pih4tr6s73a8bfk0?key=tzh1eGSENEE
+          echo "✅ Deployment triggered successfully!"
+
+# Note: GitHub Actions free tier includes 2000 minutes/month
+# This workflow uses ~5 minutes/month (96 runs/day × 30 days × 5 seconds)
+# Render Deploy Hook: https://api.render.com/deploy/srv-d643pih4tr6s73a8bfk0?key=tzh1eGSENEE

@@ -1,11 +1,62 @@
-node_modules/
-.env
-serviceAccountKey.json
-uploads/
-
+# Dependencies
 node_modules/
 package-lock.json
+yarn.lock
+pnpm-lock.yaml
 
-.vscode/
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Firebase
+serviceAccountKey.json
+firebase-debug.log
+.firebase/
+
+# Uploads (keep folder but ignore contents)
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Logs
+logs/
 *.log
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# IDE
+.vscode/
+.idea/
+*.sublime-*
+
+# Build outputs
+dist/
+build/
+.cache/
+
+# Testing
+coverage/
+.nyc_output/
+
+# Temporary files
+*.tmp
+temp/
+tmp/
+
+DEPLOYMENT_GUIDE.md
+QUICK_START.md
+DEPLOYMENT_CHECKLIST.md
+DOCUMENTATION_INDEX.md
+KEEP_ALIVE_GUIDE.md
+README.md
+START_HERE.md
+VERCEL_RENDER_SETUP.md
+
+render.yaml

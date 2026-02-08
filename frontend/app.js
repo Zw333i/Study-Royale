@@ -1,7 +1,6 @@
 // app.js
-const API_URL = window.location.hostname === 'localhost'
-  ? 'http://localhost:3000/api'
-  : 'https://study-royale.up.railway.app/api';
+// Use CONFIG from config.js to automatically detect environment
+const API_URL = window.CONFIG ? window.CONFIG.getApiUrl() : 'http://localhost:3000/api';
 
 let currentUser = null;
 let currentReviewerId = null;
