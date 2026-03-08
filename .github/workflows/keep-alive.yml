@@ -23,7 +23,7 @@ jobs:
       - name: Ping Backend Health Endpoint
         run: |
           echo "Pinging backend at $(date)"
-          response=$(curl -s -o /dev/null -w "%{http_code}" https://study-royale-backend.onrender.com/health)
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://studyroyale-backend.onrender.com/health)
           
           if [ $response -eq 200 ]; then
             echo "✅ Backend is awake and healthy (HTTP $response)"

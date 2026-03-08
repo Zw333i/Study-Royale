@@ -1,4 +1,4 @@
-// generate.js
+﻿// generate.js
 const express = require('express');
 const router = express.Router();
 const Groq = require('groq-sdk');
@@ -75,7 +75,10 @@ async function generateQuestions(text, questionTypes, count = 10, specialInstruc
         // Clean up any intro text
         typeQuestions = typeQuestions.replace(/^(Here are|Here's|Below are|I've generated).*?:\s*/i, '');
         typeQuestions = typeQuestions.trim();
-        
+
+        // Trim to exact count - prevents Groq over-generation (e.g. 32 when 30 requested)
+        typeQuestions = trimQuestionsToCount(typeQuestions, type, questionsForThisType);
+
         allQuestions += typeQuestions + '\n\n';
         console.log(`  âœ… Generated ${questionsForThisType} ${type} questions`);
         
@@ -134,7 +137,10 @@ async function generateQuestions(text, questionTypes, count = 10, specialInstruc
           newQuestions = newQuestions.replace(/^(Here are|Here's|Below are|I've|This is|Generate).*?:\s*/gi, '');
           newQuestions = newQuestions.replace(/^(Case Study|Multiple Choice|True\/False|Identification|Odd One Out|Enumeration|Matching|Association|Flashcard|Fill|Except).*?\n/gim, '');
           newQuestions = newQuestions.trim();
-          
+
+          // Trim to exact count - prevents Gemini over-generating
+          newQuestions = trimQuestionsToCount(newQuestions, missing.type, missing.needed);
+
           console.log(`  âœ… Gemini generated ${missing.needed} ${missing.type} questions`);
           allQuestions += '\n\n' + newQuestions + '\n\n';
           
@@ -526,6 +532,69 @@ Generate now:`
   }
   
   return base;
+}
+
+
+// Trim generated questions to exactly maxCount items per type.
+// Prevents LLM over-generation (e.g. asking for 30 but getting 32).
+function trimQuestionsToCount(text, questionType, maxCount) {
+  if (!text || maxCount <= 0) return text;
+  const lines = text.split('\n');
+
+  if (questionType === 'matching') {
+    // Matching: keep the header line + first maxCount pair lines
+    const result = [];
+    let pairCount = 0;
+    for (const line of lines) {
+      if (line.trim().startsWith('Column A |')) {
+        result.push(line);
+        continue;
+      }
+      if (line.includes(' | ')) {
+        if (pairCount < maxCount) { result.push(line); pairCount++; }
+      } else {
+        result.push(line);
+      }
+    }
+    return result.join('\n');
+  }
+
+  const isQuestionStart = (line) => {
+    const l = line.trim();
+    switch (questionType) {
+      case 'multiple-choice':
+      case 'identification':
+      case 'fill-blank':
+      case 'enumeration':
+      case 'odd-one-out':
+      case 'except-questions':
+        return l.startsWith('Q:');
+      case 'true-false':
+      case 'conditional-true-false':
+      case 'association':
+        return l.startsWith('Statement:');
+      case 'flashcard':
+        return l.startsWith('Front:');
+      case 'case-study':
+        return l.startsWith('Scenario:');
+      default:
+        return l.startsWith('Q:');
+    }
+  };
+
+  // Group lines into question blocks, keep first maxCount
+  const blocks = [];
+  let current = [];
+  for (const line of lines) {
+    if (isQuestionStart(line) && current.length > 0) {
+      blocks.push(current);
+      current = [];
+    }
+    current.push(line);
+  }
+  if (current.some(l => l.trim())) blocks.push(current);
+
+  return blocks.slice(0, maxCount).map(b => b.join('\n')).join('\n');
 }
 
 function buildPrompt(text, questionTypes, count, specialInstructions, questionsData = {}, attempt = 1) {
@@ -1250,7 +1319,10 @@ async function checkAnswerWithAI(userAnswer, correctAnswer, questionText) {
     console.error('AI checking error:', error);
     const userLower = userAnswer.toLowerCase().trim();
     const correctLower = correctAnswer.toLowerCase().trim();
-    return userLower === correctLower || userAnswer.trim() === correctAnswer.trim();
+    return {
+      isCorrect: userLower === correctLower || userAnswer.trim() === correctAnswer.trim(),
+      explanation: 'AI unavailable - checked by exact match.'
+    };
   }
 }
 
