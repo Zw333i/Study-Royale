@@ -249,11 +249,20 @@
 
                 <div class="upload-card">
                     <div class="upload-area" onclick="document.getElementById('fileInput').click()">
-                        <div class="upload-icon">📄</div>
-                        <h3>Choose your study file(s)</h3>
+                        <div class="upload-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M13 2H7a2 2 0 00-2 2v16a2 2 0 002 2h10a2 2 0 002-2V8z"></path>
+                                <path d="M13 2v6h6"></path>
+                                <path d="M8 18l3-3"></path>
+                                <path d="M10 20l5-5"></path>
+                            </svg>
+                        </div>
+                        <h3>Upload your files!</h3>
                         <p>PDF, DOCX, or TXT (Maximum of 20MB per file)</p>
-                        <input type="file" id="fileInput" accept=".pdf,.docx,.txt" onchange="handleFileSelect(this)" multiple hidden>
+                        <small class="upload-drop-hint">Drag and drop files here, or click to browse</small>
+                        <input type="file" id="fileInput" accept=".pdf,.docx,.txt" onchange="handleFileSelect(this)" hidden>
                         <div id="fileNames" class="file-names"></div>
+                        <small id="fileErrorText" class="field-error" style="display:none;"></small>
                     </div>
 
                     <div class="upload-form">
@@ -266,14 +275,7 @@
                                 required
                                 pattern="\d{4}-\d{2}-\d{2}"
                             >
-                        </div>
-                        
-                        <div id="mergeOptionsContainer" class="form-group" style="display: none;">
-                            <label>Multiple Files Detected</label>
-                            <select id="mergeOption" class="form-control">
-                                <option value="merge">Merge Files</option>
-                                <option value="separate">Keep Separate</option>
-                            </select>
+                            <small id="dateErrorText" class="field-error" style="display:none;"></small>
                         </div>
 
                     <button class="btn-primary btn-block" onclick="openUploadConfirmation()" id="uploadBtn">
@@ -333,9 +335,14 @@ Answer: B
         <!-- Materials Section -->
         <div id="materialsSection" class="section">
             <div class="container">
-                <div class="page-header">
-                    <h1>My Study Materials</h1>
-                    <button class="btn-secondary" onclick="loadReviewers()">Refresh</button>
+                <div class="page-header materials-page-header">
+                    <div class="materials-title-block">
+                        <div class="materials-title-row">
+                            <h1>My Study Materials</h1>
+                            <div id="materialsStats" class="materials-stats" style="display:none;"></div>
+                        </div>
+                        <button class="btn-secondary materials-refresh-btn" onclick="loadReviewers()">Refresh</button>
+                    </div>
                 </div>
 
                 <div id="reviewersList" class="materials-grid"></div>
@@ -367,6 +374,18 @@ Answer: B
                 </div>
                 <span class="brand-name">Study Royale</span>
             </div>
+            <div id="timerDisplay" class="timer-display" style="display:none;">
+                <span class="timer-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="13" r="8"></circle>
+                        <path d="M12 13V9"></path>
+                        <path d="M12 13L15 15"></path>
+                        <path d="M9 2h6"></path>
+                        <path d="M12 5v1"></path>
+                    </svg>
+                </span>
+                <span id="timerCountdown">00:00</span>
+            </div>
             <div class="nav-menu">
                 <button class="btn-back" onclick="exitQuiz()">← Back to Materials</button>
             </div>
@@ -376,6 +395,11 @@ Answer: B
             <div class="quiz-header">
                 <h1 id="quizTitle">Quiz</h1>
                 <div id="quizProgress"></div>
+                <div id="quizNav" class="quiz-nav" style="display:none;">
+                    <button class="nav-btn-quiz" onclick="prevQuestion()" id="prevBtn" disabled>← Prev</button>
+                    <span id="questionCounter" class="question-counter">1 / ?</span>
+                    <button class="nav-btn-quiz" onclick="nextQuestion()" id="nextBtn">Next →</button>
+                </div>
             </div>
             <div id="quizContent"></div>
             <div class="quiz-actions">
@@ -390,68 +414,151 @@ Answer: B
         <div class="modal-overlay" onclick="closeModal()"></div>
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Quiz Settings</h2>
+                <div>
+                    <h2>Quiz Settings</h2>
+                    <p class="modal-subtitle">Build a custom quiz flow for your review session</p>
+                </div>
                 <button class="modal-close" onclick="closeModal()">×</button>
             </div>
 
             <div class="modal-body">
-                <div class="form-group">
+                <div class="form-group modal-section">
                     <label>Chatbot</label>
                     <button type="button" class="btn-primary" onclick="startLearnMode()" style="margin-bottom: 20px;">
                         <span>Learn Mode</span>
                     </button>
                 </div>
-                <div class="form-group">
+                <div class="form-group modal-section">
                     <label>Select Quiz Type(s)</label>
                     <p class="helper-text"><strong>Note:</strong> Flashcards can only be selected alone<br></p>
                 <div class="quiz-types">
                     <button type="button" class="quiz-type-btn" data-type="fill-blank">
-                        <span class="type-icon">📝</span>
-                        <span>Fill in the Blank</span>
+                        <span class="type-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M14 3h7v7"></path>
+                                <path d="M21 3l-9 9"></path>
+                                <path d="M5 4h4"></path>
+                                <path d="M3 9h7"></path>
+                                <path d="M3 14h5"></path>
+                                <path d="M3 19h11"></path>
+                            </svg>
+                        </span>
+                        <span class="type-label">Fill in the Blank</span>
                     </button>
                     <button type="button" class="quiz-type-btn" data-type="identification">
-                        <span class="type-icon">🔍</span>
-                        <span>Identification</span>
+                        <span class="type-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="11" cy="11" r="7"></circle>
+                                <path d="M21 21l-4.3-4.3"></path>
+                            </svg>
+                        </span>
+                        <span class="type-label">Identification</span>
                     </button>
                     <button type="button" class="quiz-type-btn" data-type="multiple-choice">
-                        <span class="type-icon">✅</span>
-                        <span>Multiple Choice</span>
+                        <span class="type-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="3" width="18" height="18" rx="3"></rect>
+                                <path d="M8 12l3 3 5-6"></path>
+                            </svg>
+                        </span>
+                        <span class="type-label">Multiple Choice</span>
                     </button>
                     <button type="button" class="quiz-type-btn" data-type="true-false">
-                        <span class="type-icon">✓</span>
-                        <span>True or False</span>
+                        <span class="type-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M4 6h16"></path>
+                                <path d="M4 12h9"></path>
+                                <path d="M4 18h5"></path>
+                                <path d="M15 15l2 2 4-5"></path>
+                            </svg>
+                        </span>
+                        <span class="type-label">True or False</span>
                     </button>
                     <button type="button" class="quiz-type-btn" data-type="conditional-true-false">
-                        <span class="type-icon">✓</span>
-                        <span>Conditional T/F</span>
+                        <span class="type-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M3 5h8"></path>
+                                <path d="M3 12h8"></path>
+                                <path d="M3 19h8"></path>
+                                <path d="M13 7l2 2 4-5"></path>
+                                <path d="M13 16h8"></path>
+                            </svg>
+                        </span>
+                        <span class="type-label">Conditional T/F</span>
                     </button>
                     <button type="button" class="quiz-type-btn" data-type="association">
-                        <span class="type-icon">🔗</span>
-                        <span>Association</span>
+                        <span class="type-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M10 14L8 16a3 3 0 104 4l2-2"></path>
+                                <path d="M14 10l2-2a3 3 0 10-4-4L10 6"></path>
+                                <path d="M8 12h8"></path>
+                            </svg>
+                        </span>
+                        <span class="type-label">Association</span>
                     </button>
                     <button type="button" class="quiz-type-btn" data-type="case-study">
-                        <span class="type-icon">📋</span>
-                        <span>Case Study</span>
+                        <span class="type-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="6" y="3" width="12" height="18" rx="2"></rect>
+                                <path d="M9 7h6"></path>
+                                <path d="M9 11h6"></path>
+                                <path d="M9 15h4"></path>
+                            </svg>
+                        </span>
+                        <span class="type-label">Case Study</span>
                     </button>
                     <button type="button" class="quiz-type-btn" data-type="odd-one-out">
-                        <span class="type-icon">🎯</span>
-                        <span>Odd One Out</span>
+                        <span class="type-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="8"></circle>
+                                <circle cx="12" cy="12" r="4"></circle>
+                                <circle cx="12" cy="12" r="1"></circle>
+                            </svg>
+                        </span>
+                        <span class="type-label">Odd One Out</span>
                     </button>
                     <button type="button" class="quiz-type-btn" data-type="except-questions">
-                        <span class="type-icon">❌</span>
-                        <span>EXCEPT Questions</span>
+                        <span class="type-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="9"></circle>
+                                <path d="M9 9l6 6"></path>
+                                <path d="M15 9l-6 6"></path>
+                            </svg>
+                        </span>
+                        <span class="type-label">EXCEPT Questions</span>
                     </button>
                     <button type="button" class="quiz-type-btn" data-type="enumeration">
-                        <span class="type-icon">📊</span>
-                        <span>Enumeration</span>
+                        <span class="type-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M4 5h2"></path>
+                                <path d="M8 5h12"></path>
+                                <path d="M4 12h2"></path>
+                                <path d="M8 12h12"></path>
+                                <path d="M4 19h2"></path>
+                                <path d="M8 19h12"></path>
+                            </svg>
+                        </span>
+                        <span class="type-label">Enumeration</span>
                     </button>
                     <button type="button" class="quiz-type-btn" data-type="matching">
-                        <span class="type-icon">🔀</span>
-                        <span>Matching Type</span>
+                        <span class="type-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M4 7h8"></path>
+                                <path d="M8 3l4 4-4 4"></path>
+                                <path d="M20 17h-8"></path>
+                                <path d="M16 13l-4 4 4 4"></path>
+                            </svg>
+                        </span>
+                        <span class="type-label">Matching Type</span>
                     </button>
                     <button type="button" class="quiz-type-btn" data-type="flashcard">
-                        <span class="type-icon">🃏</span>
-                        <span>Flashcards</span>
+                        <span class="type-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="6" y="5" width="12" height="14" rx="2"></rect>
+                                <path d="M9 2h8a2 2 0 012 2v12"></path>
+                            </svg>
+                        </span>
+                        <span class="type-label">Flashcards</span>
                     </button>
                 </div>
                 </div>
@@ -465,6 +572,55 @@ Answer: B
                     <label>Special Instructions (Optional)</label>
                     <textarea id="specialInstructions" class="form-control" rows="3" placeholder="e.g., Focus on definitions, include calculations, make it challenging, use specific topics..."></textarea>
                     <small class="helper-text">AI will generate questions based on your study material and these instructions</small>
+                </div>
+
+                <div class="form-group">
+                    <label>Quiz Options</label>
+                    <div class="quiz-options-grid">
+                        <div class="checkbox-wrapper checkbox-option">
+                            <input type="checkbox" class="check" id="oneByOneToggle">
+                            <label for="oneByOneToggle" class="label">
+                                <svg width="45" height="45" viewBox="0 0 95 95" aria-hidden="true">
+                                    <rect x="30" y="20" width="50" height="50" stroke="currentColor" fill="none"></rect>
+                                    <g transform="translate(0,-952.36222)">
+                                        <path d="m 56,963 c -102,122 6,9 7,9 17,-5 -66,69 -38,52 122,-77 -7,14 18,4 29,-11 45,-43 23,-4" stroke="currentColor" stroke-width="3" fill="none" class="path1"></path>
+                                    </g>
+                                </svg>
+                                <span>Show one question at a time</span>
+                            </label>
+                        </div>
+                        <div class="checkbox-wrapper checkbox-option">
+                            <input type="checkbox" class="check" id="shuffleToggle">
+                            <label for="shuffleToggle" class="label">
+                                <svg width="45" height="45" viewBox="0 0 95 95" aria-hidden="true">
+                                    <rect x="30" y="20" width="50" height="50" stroke="currentColor" fill="none"></rect>
+                                    <g transform="translate(0,-952.36222)">
+                                        <path d="m 56,963 c -102,122 6,9 7,9 17,-5 -66,69 -38,52 122,-77 -7,14 18,4 29,-11 45,-43 23,-4" stroke="currentColor" stroke-width="3" fill="none" class="path1"></path>
+                                    </g>
+                                </svg>
+                                <span>Shuffle questions</span>
+                            </label>
+                        </div>
+                        <div class="checkbox-wrapper checkbox-option">
+                            <input type="checkbox" class="check" id="timerToggle" onchange="toggleTimerInput()">
+                            <label for="timerToggle" class="label">
+                                <svg width="45" height="45" viewBox="0 0 95 95" aria-hidden="true">
+                                    <rect x="30" y="20" width="50" height="50" stroke="currentColor" fill="none"></rect>
+                                    <g transform="translate(0,-952.36222)">
+                                        <path d="m 56,963 c -102,122 6,9 7,9 17,-5 -66,69 -38,52 122,-77 -7,14 18,4 29,-11 45,-43 23,-4" stroke="currentColor" stroke-width="3" fill="none" class="path1"></path>
+                                    </g>
+                                </svg>
+                                <span>Enable timer</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div id="timerInputGroup" style="display:none; margin-top: 12px;">
+                        <label style="font-weight:400; color: var(--text-muted);">
+                            Duration:&nbsp;
+                            <input type="number" id="timerMinutes" class="form-control" value="10" min="1" max="120" style="width:80px; display:inline-block; padding:8px 10px;">
+                            &nbsp;minutes
+                        </label>
+                    </div>
                 </div>
             </div>
 
@@ -480,28 +636,44 @@ Answer: B
         <div class="modal-overlay" onclick="closeUploadConfirmation()"></div>
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Confirm File Upload</h2>
+                <div>
+                    <h2>Confirm File Upload</h2>
+                    <p class="modal-subtitle">Review details before processing your study material</p>
+                </div>
                 <button class="modal-close" onclick="closeUploadConfirmation()">×</button>
             </div>
 
             <div class="modal-body">
-                <div class="confirmation-section">
+                <div class="confirmation-section modal-section">
+                    <h3>Quiz Name</h3>
+                    <div class="quiz-name-row">
+                        <input type="text" id="confirmQuizName" class="form-control" readonly>
+                        <button type="button" id="renameQuizBtn" class="rename-btn" onclick="enableQuizNameEdit()" title="Rename quiz">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M12 20h9"></path>
+                                <path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4 12.5-12.5z"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="confirmation-section modal-section">
                     <h3>Files to Upload</h3>
                     <div id="confirmFileList" class="file-list-confirmation"></div>
                 </div>
 
-                <div class="confirmation-section">
+                <div class="confirmation-section modal-section">
                     <h3>Exam Date</h3>
                     <p id="confirmExamDate" class="exam-date-display"></p>
                 </div>
 
-                <div class="confirmation-section info-section">
+                <div class="confirmation-section info-section modal-section">
                     <p class="info-text">
                         <strong>Note:</strong> Your files will be automatically deleted after the exam date for storage optimization. You can always re-upload if needed.
                     </p>
                 </div>
 
-                <div class="confirmation-section">
+                <div class="confirmation-section modal-section" id="mergeConfirmSection" style="display:none;">
                     <label>
                         <input type="checkbox" id="mergeConfirm" checked>
                         <span>Merge files into one material</span>

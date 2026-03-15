@@ -62,7 +62,7 @@ router.post('/', verifyToken, upload.single('file'), async (req, res) => {
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    const { examDate } = req.body;
+    const { examDate, quizName } = req.body;
     const userId = req.user.uid;
     
     if (!examDate) {
@@ -74,6 +74,9 @@ router.post('/', verifyToken, upload.single('file'), async (req, res) => {
 
     const filePath = req.file.path;
     const fileName = req.file.originalname;
+    const sanitizedQuizName = quizName && quizName.trim().length > 0
+      ? quizName.trim().slice(0, 120)
+      : fileName;
     const fileType = path.extname(fileName).toLowerCase();
 
     // Extract text from file
@@ -91,7 +94,7 @@ router.post('/', verifyToken, upload.single('file'), async (req, res) => {
     console.log('Saving to Firestore...');
     const docRef = await db.collection('reviewers').add({
       userId: userId,
-      fileName: fileName,
+      fileName: sanitizedQuizName,
       textExtracted: extractedText,
       uploadDate: new Date().toISOString(),
       examDate: examDate,
@@ -110,7 +113,7 @@ router.post('/', verifyToken, upload.single('file'), async (req, res) => {
       success: true,
       message: 'File uploaded and processed successfully',
       reviewerId: docRef.id,
-      fileName: fileName,
+      fileName: sanitizedQuizName,
       textLength: extractedText.length
     });
 
@@ -132,7 +135,7 @@ router.post('/upload-merged', verifyToken, upload.array('files', 10), async (req
       return res.status(400).json({ error: 'No files uploaded' });
     }
 
-    const { examDate } = req.body;
+    const { examDate, quizName } = req.body;
     const userId = req.user.uid;
     
     if (!examDate) {
@@ -173,11 +176,16 @@ router.post('/upload-merged', verifyToken, upload.array('files', 10), async (req
       });
     }
 
+    const mergedDefaultName = `Merged: ${fileNames.join(', ')}`;
+    const sanitizedQuizName = quizName && quizName.trim().length > 0
+      ? quizName.trim().slice(0, 120)
+      : mergedDefaultName;
+
     // Save merged content to Firestore
     console.log('Saving merged files to Firestore...');
     const docRef = await db.collection('reviewers').add({
       userId: userId,
-      fileName: `Merged: ${fileNames.join(', ')}`,
+      fileName: sanitizedQuizName,
       textExtracted: mergedText,
       uploadDate: new Date().toISOString(),
       examDate: examDate,
@@ -196,7 +204,7 @@ router.post('/upload-merged', verifyToken, upload.array('files', 10), async (req
       success: true,
       message: 'Files merged and uploaded successfully',
       reviewerId: docRef.id,
-      fileName: `Merged: ${fileNames.join(', ')}`,
+      fileName: sanitizedQuizName,
       fileCount: fileNames.length,
       textLength: mergedText.length
     });

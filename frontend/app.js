@@ -21,6 +21,16 @@ let materialsPageCurrent = 1;
 const materialsPageSize = 5; 
 let totalMaterialsCount = 0;
 
+// ===== ONE-BY-ONE / SHUFFLE / TIMER STATE =====
+let isOneByOneMode = false;
+let currentQuestionIndex = 0;
+let isShuffleEnabled = false;
+let isTimerEnabled = false;
+let timerDuration = 10;
+let timerInterval = null;
+let timerSecondsLeft = 0;
+let selectedUploadFiles = [];
+
 // ===== THROTTLING UTILITY =====
 const throttledFunctions = new Map();
 
@@ -177,17 +187,95 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
-    const lightModeEnabled = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
-    if (lightModeEnabled) {
-        document.body.classList.add('light-mode');
-        const switchElement = document.getElementById('switch');
-        if (switchElement) switchElement.checked = true;
-    }
+    // Default to light mode on initial load
+    document.body.classList.add('light-mode');
+    const switchElement = document.getElementById('switch');
+    const desktopSwitch = document.getElementById('switch-desktop');
+    if (switchElement) switchElement.checked = true;
+    if (desktopSwitch) desktopSwitch.checked = true;
     
     if (!currentUser) {
         showAuthPage();
     }
+
+    initializeUploadDropzone();
 });
+
+function initializeUploadDropzone() {
+    const uploadArea = document.querySelector('.upload-area');
+    const fileInput = document.getElementById('fileInput');
+    if (!uploadArea || !fileInput) return;
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        uploadArea.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            uploadArea.classList.add('dragover');
+        });
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        uploadArea.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            uploadArea.classList.remove('dragover');
+        });
+    });
+
+    uploadArea.addEventListener('drop', (e) => {
+        const files = e.dataTransfer?.files;
+        if (!files || files.length === 0) return;
+        addFilesToUploadQueue(Array.from(files));
+    });
+}
+
+function getUploadFileKey(file) {
+    return `${file.name}_${file.size}_${file.lastModified}`;
+}
+
+function addFilesToUploadQueue(files) {
+    clearUploadFieldError('file');
+    const existingKeys = new Set(selectedUploadFiles.map(getUploadFileKey));
+
+    files.forEach(file => {
+        const key = getUploadFileKey(file);
+        if (!existingKeys.has(key)) {
+            selectedUploadFiles.push(file);
+            existingKeys.add(key);
+        }
+    });
+
+    renderUploadFileQueue();
+}
+
+function removeUploadFileAt(index) {
+    selectedUploadFiles.splice(index, 1);
+    renderUploadFileQueue();
+}
+
+function renderUploadFileQueue() {
+    const fileNamesContainer = document.getElementById('fileNames');
+    if (!fileNamesContainer) return;
+
+    const fileSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2H7a2 2 0 00-2 2v16a2 2 0 002 2h10a2 2 0 002-2V8z"></path><path d="M13 2v6h6"></path></svg>`;
+    const trashSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path></svg>`;
+
+    if (selectedUploadFiles.length === 0) {
+        fileNamesContainer.innerHTML = '';
+        return;
+    }
+
+    fileNamesContainer.innerHTML = selectedUploadFiles.map((file, index) => {
+        return `
+            <div class="upload-file-item">
+                <span class="upload-file-info">${fileSvg}<span>${file.name} (${(file.size / 1024).toFixed(2)} KB)</span></span>
+                <button type="button" class="remove-file-btn" onclick="event.stopPropagation(); removeUploadFileAt(${index});" title="Remove file">
+                    ${trashSvg}
+                </button>
+            </div>
+        `;
+    }).join('');
+}
 
 // ===== PAGE NAVIGATION =====
 function showAuthPage() {
@@ -294,7 +382,7 @@ async function login(event) {
         loginBtn.textContent = 'Signing in...';
         
         await auth.signInWithEmailAndPassword(email, password);
-        showAlert('Welcome back! 🎉');
+        showAlert('Welcome back!');
     } catch (error) {
         let errorMessage = 'Login failed';
         
@@ -360,7 +448,7 @@ async function signup(event) {
         const result = await auth.createUserWithEmailAndPassword(email, password);
         await result.user.updateProfile({ displayName: name });
         
-        showAlert('Account created successfully! Welcome to Study Royale! 🎉');
+        showAlert('Account created successfully! Welcome to Study Royale!');
     } catch (error) {
         let errorMessage = 'Signup failed';
         
@@ -461,9 +549,9 @@ const sendVerificationCode = throttle(async function() {
         const appVerifier = window.recaptchaVerifier;
         confirmationResult = await auth.signInWithPhoneNumber(phoneNumber, appVerifier);
         
-        showAlert('Verification code sent to your phone! 📱', 'success');
+        showAlert('Verification code sent to your phone!', 'success');
         document.getElementById('verificationCodeSection').classList.remove('hidden');
-        sendBtn.textContent = 'Code Sent ✓';
+        sendBtn.textContent = 'Code Sent';
         
     } catch (error) {
         console.error('SMS send error:', error);
@@ -537,7 +625,7 @@ function showAlert(message, type = 'success', duration = 5000) {
     const icons = {
         success: '✓',
         error: '✕',
-        warning: '⚠',
+        warning: '!',
         info: 'ℹ'
     };
     
@@ -609,7 +697,7 @@ function showValidationErrors(errors) {
     const errorList = errors.map(err => `<li>${err}</li>`).join('');
     
     alert.innerHTML = `
-        <span class="alert-icon">⚠</span>
+        <span class="alert-icon">!</span>
         <div class="alert-content">
             <strong>Please fix the following:</strong>
             <ul>${errorList}</ul>
@@ -648,6 +736,36 @@ function validateFileSize(file, maxSizeMB = 20) {
 function validateFileType(file, allowedTypes = ['.pdf', '.docx', '.txt']) {
     const ext = '.' + file.name.split('.').pop().toLowerCase();
     return allowedTypes.includes(ext);
+}
+
+function setUploadFieldError(field, message) {
+    const errorMap = {
+        file: 'fileErrorText',
+        date: 'dateErrorText'
+    };
+    const errorEl = document.getElementById(errorMap[field]);
+    if (!errorEl) return;
+    errorEl.textContent = message;
+    errorEl.style.display = 'block';
+}
+
+function clearUploadFieldError(field) {
+    const errorMap = {
+        file: 'fileErrorText',
+        date: 'dateErrorText'
+    };
+    const errorEl = document.getElementById(errorMap[field]);
+    if (!errorEl) return;
+    errorEl.textContent = '';
+    errorEl.style.display = 'none';
+}
+
+function enableQuizNameEdit() {
+    const input = document.getElementById('confirmQuizName');
+    if (!input) return;
+    input.readOnly = false;
+    input.focus();
+    input.select();
 }
 
 function togglePassword(inputId) {
@@ -725,52 +843,40 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ===== FILE UPLOAD =====
 function handleFileSelect(input) {
-    const fileNamesContainer = document.getElementById('fileNames');
-    const mergeOptionsContainer = document.getElementById('mergeOptionsContainer');
-    
     if (input.files && input.files.length > 0) {
-        fileNamesContainer.innerHTML = '';
-        
-        Array.from(input.files).forEach((file, index) => {
-            const fileDiv = document.createElement('div');
-            fileDiv.innerHTML = `📄 ${file.name} (${(file.size / 1024).toFixed(2)} KB)`;
-            fileNamesContainer.appendChild(fileDiv);
-        });
-        
-        if (input.files.length > 1) {
-            mergeOptionsContainer.style.display = 'block';
-        } else {
-            mergeOptionsContainer.style.display = 'none';
-        }
-    } else {
-        fileNamesContainer.innerHTML = '';
-        mergeOptionsContainer.style.display = 'none';
+        addFilesToUploadQueue(Array.from(input.files));
+        // Clear input so selecting the same file again can still trigger change
+        input.value = '';
     }
 }
 
 function openUploadConfirmation() {
     console.log('openUploadConfirmation called');
     
-    const fileInput = document.getElementById('fileInput');
     const examDateInput = document.getElementById('examDate');
     const examDate = examDateInput.value;
     
-    if (!fileInput.files || fileInput.files.length === 0) {
-        showAlert('❌ Please select at least one file to upload', 'error', 4000);
+    if (selectedUploadFiles.length === 0) {
+        setUploadFieldError('file', 'Please select at least one file.');
+        showAlert('Please select at least one file to upload', 'error', 4000);
         return;
     }
+    clearUploadFieldError('file');
     
     if (!examDate) {
-        showAlert('📅 Please select an exam date', 'error', 4000);
+        setUploadFieldError('date', 'Please select your exam date.');
+        showAlert('Please select an exam date', 'error', 4000);
         return;
     }
+    clearUploadFieldError('date');
     
     // Validate exam date format and value
     const selectedDate = new Date(examDate);
 
     // Check if date is valid (not NaN)
     if (isNaN(selectedDate.getTime())) {
-        showAlert('⚠ Invalid date format. Please use the date picker.', 'error', 4000);
+        setUploadFieldError('date', 'Invalid date format. Please use the date picker.');
+        showAlert('Invalid date format. Please use the date picker.', 'error', 4000);
         examDateInput.focus();
         return;
     }
@@ -781,7 +887,8 @@ function openUploadConfirmation() {
     const maxYear = currentYear + 10;
 
     if (year < currentYear || year > maxYear) {
-        showAlert(`⚠ Exam year must be between ${currentYear} and ${maxYear}`, 'error', 4000);
+        setUploadFieldError('date', `Exam year must be between ${currentYear} and ${maxYear}.`);
+        showAlert(`Exam year must be between ${currentYear} and ${maxYear}`, 'error', 4000);
         examDateInput.focus();
         return;
     }
@@ -790,36 +897,56 @@ function openUploadConfirmation() {
     today.setHours(0, 0, 0, 0);
 
     if (selectedDate < today) {
-        showAlert('📅 Exam date cannot be in the past', 'error', 4000);
+        setUploadFieldError('date', 'Exam date cannot be in the past.');
+        showAlert('Exam date cannot be in the past', 'error', 4000);
         examDateInput.focus();
         return;
     }
 
     const errors = [];
     
-    if (fileInput.files) {
-        for (let file of fileInput.files) {
-            if (!validateFileType(file)) {
-                errors.push(`"${file.name}" - Only PDF, DOCX, and TXT files are allowed`);
-            }
-            if (!validateFileSize(file, 20)) {
-                errors.push(`"${file.name}" - File size exceeds 20MB limit`);
-            }
+    for (let file of selectedUploadFiles) {
+        if (!validateFileType(file)) {
+            errors.push(`"${file.name}" - Only PDF, DOCX, and TXT files are allowed`);
+        }
+        if (!validateFileSize(file, 20)) {
+            errors.push(`"${file.name}" - File size exceeds 20MB limit`);
         }
     }
     
     if (errors.length > 0) {
+        setUploadFieldError('file', 'One or more selected files are invalid.');
         showValidationErrors(errors);
         return;
     }
+    clearUploadFieldError('file');
+    clearUploadFieldError('date');
     
     const confirmFileList = document.getElementById('confirmFileList');
-    confirmFileList.innerHTML = Array.from(fileInput.files).map(file => `
+    const fileSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2H7a2 2 0 00-2 2v16a2 2 0 002 2h10a2 2 0 002-2V8z"></path><path d="M13 2v6h6"></path></svg>`;
+    confirmFileList.innerHTML = selectedUploadFiles.map(file => `
         <div class="file-item-confirm">
-            <strong>📄 ${file.name}</strong><br>
-            ${(file.size / 1024).toFixed(2)} KB
+            <strong>${fileSvg}<span>${file.name}</span></strong><br>
+            <span>${(file.size / 1024).toFixed(2)} KB</span>
         </div>
     `).join('');
+
+    const mergeConfirmSection = document.getElementById('mergeConfirmSection');
+    const mergeCheckbox = document.getElementById('mergeConfirm');
+    if (selectedUploadFiles.length > 1) {
+        mergeConfirmSection.style.display = 'block';
+        mergeCheckbox.checked = true;
+    } else {
+        mergeConfirmSection.style.display = 'none';
+        mergeCheckbox.checked = false;
+    }
+
+    const defaultQuizName = selectedUploadFiles.length > 1
+        ? `Merged Review - ${examDate}`
+        : selectedUploadFiles[0].name.replace(/\.[^/.]+$/, '');
+    const quizNameInput = document.getElementById('confirmQuizName');
+    quizNameInput.value = defaultQuizName;
+    quizNameInput.readOnly = true;
     
     const examDateObj = new Date(examDate);
     const formattedDate = examDateObj.toLocaleDateString('en-US', { 
@@ -838,30 +965,46 @@ function closeUploadConfirmation() {
 }
 
 const proceedWithUpload = throttle(async function() {
-    const fileInput = document.getElementById('fileInput');
     const examDate = document.getElementById('examDate').value;
     const uploadBtn = document.getElementById('confirmUploadBtn');
     const mergeCheckbox = document.getElementById('mergeConfirm');
-    const mergeOption = mergeCheckbox.checked ? 'merge' : 'separate';
+    const mergeConfirmSection = document.getElementById('mergeConfirmSection');
+    const quizNameInput = document.getElementById('confirmQuizName');
+    const customQuizName = quizNameInput ? quizNameInput.value.trim() : '';
+    const allowMerge = mergeConfirmSection && mergeConfirmSection.style.display !== 'none';
+    const mergeOption = allowMerge && mergeCheckbox.checked ? 'merge' : 'separate';
     
     const originalText = uploadBtn.textContent;
     uploadBtn.disabled = true;
     uploadBtn.textContent = 'Uploading...';
     closeUploadConfirmation();
 
+    if (selectedUploadFiles.length === 0) {
+        showAlert('Please select at least one file to upload', 'error');
+        uploadBtn.disabled = false;
+        uploadBtn.textContent = originalText;
+        return;
+    }
+
     try {
-        if (fileInput.files.length === 1 || mergeOption === 'separate') {
+        if (selectedUploadFiles.length === 1 || mergeOption === 'separate') {
             let successCount = 0;
-            const totalFiles = fileInput.files.length;
+            const totalFiles = selectedUploadFiles.length;
             
-            for (let i = 0; i < fileInput.files.length; i++) {
+            for (let i = 0; i < selectedUploadFiles.length; i++) {
                 const progress = Math.round(((i) / totalFiles) * 100);
-                uploadBtn.textContent = `⬆ Uploading ${i + 1}/${totalFiles}... ${progress}%`;
+                uploadBtn.textContent = `Uploading ${i + 1}/${totalFiles}... ${progress}%`;
                 uploadBtn.style.opacity = (1 - (progress / 100) * 0.3).toString();
                 
                 const formData = new FormData();
-                formData.append('file', fileInput.files[i]);
+                formData.append('file', selectedUploadFiles[i]);
                 formData.append('examDate', examDate);
+                if (customQuizName) {
+                    const nameForFile = selectedUploadFiles.length > 1
+                        ? `${customQuizName} (${i + 1})`
+                        : customQuizName;
+                    formData.append('quizName', nameForFile);
+                }
 
                 try {
                     const response = await fetch(`${API_URL}/upload`, {
@@ -883,20 +1026,23 @@ const proceedWithUpload = throttle(async function() {
             
             uploadBtn.style.opacity = '1';
             
-            if (successCount === fileInput.files.length) {
-                showAlert(`✓ Successfully uploaded ${successCount} file(s)!`, 'success');
+            if (successCount === selectedUploadFiles.length) {
+                showAlert(`Successfully uploaded ${successCount} file(s)!`, 'success');
             } else {
-                showAlert(`⚠ Uploaded ${successCount} of ${totalFiles} files`, 'warning');
+                showAlert(`Uploaded ${successCount} of ${totalFiles} files`, 'warning');
             }
         }
         else {
             uploadBtn.textContent = 'Merging and uploading...';
             
             const formData = new FormData();
-            for (let i = 0; i < fileInput.files.length; i++) {
-                formData.append('files', fileInput.files[i]);
+            for (let i = 0; i < selectedUploadFiles.length; i++) {
+                formData.append('files', selectedUploadFiles[i]);
             }
             formData.append('examDate', examDate);
+            if (customQuizName) {
+                formData.append('quizName', customQuizName);
+            }
 
             const response = await fetch(`${API_URL}/upload/upload-merged`, {
                 method: 'POST',
@@ -909,20 +1055,22 @@ const proceedWithUpload = throttle(async function() {
             const data = await response.json();
 
             if (data.success) {
-                showAlert(`✓ Files merged and uploaded successfully! (${data.fileCount} files combined)`, 'success');
+                showAlert(`Files merged and uploaded successfully! (${data.fileCount} files combined)`, 'success');
             } else {
                 showAlert(data.error || 'Upload failed', 'error');
             }
         }
 
         // Reset form
-        fileInput.value = '';
+        document.getElementById('fileInput').value = '';
+        selectedUploadFiles = [];
         document.getElementById('fileNames').innerHTML = '';
         document.getElementById('examDate').value = '';
-        document.getElementById('mergeOptionsContainer').style.display = 'none';
+        clearUploadFieldError('file');
+        clearUploadFieldError('date');
         
         loadReviewers();
-        showAlert('✓ Redirecting to My Materials...', 'info', 2000);
+        showAlert('Redirecting to My Materials...', 'info', 2000);
         
         setTimeout(() => {
             document.querySelector('[data-page="materials"]').click();
@@ -1098,9 +1246,49 @@ async function loadReviewers() {
     loadMaterialsPage(1);
 }
 
+function renderMaterialsStats(uploadedMaterials, importedMaterials) {
+    const statsContainer = document.getElementById('materialsStats');
+    if (!statsContainer) return;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const upcomingExams = uploadedMaterials.filter(material => {
+        const exam = new Date(material.examDate);
+        return !isNaN(exam.getTime()) && exam >= today;
+    }).length;
+
+    const totalMaterials = uploadedMaterials.length + importedMaterials.length;
+
+    statsContainer.innerHTML = `
+        <div class="materials-stat-card">
+            <span class="materials-stat-label">Total Materials</span>
+            <span class="materials-stat-value">${totalMaterials}</span>
+        </div>
+        <div class="materials-stat-card">
+            <span class="materials-stat-label">Upcoming Exams</span>
+            <span class="materials-stat-value">${upcomingExams}</span>
+        </div>
+        <div class="materials-stat-card">
+            <span class="materials-stat-label">Imported Quizzes</span>
+            <span class="materials-stat-value">${importedMaterials.length}</span>
+        </div>
+    `;
+    statsContainer.style.display = 'flex';
+
+    const statValues = statsContainer.querySelectorAll('.materials-stat-value');
+    statValues.forEach((valueEl, idx) => {
+        valueEl.classList.remove('stat-pop');
+        valueEl.style.animationDelay = `${idx * 0.06}s`;
+        requestAnimationFrame(() => valueEl.classList.add('stat-pop'));
+    });
+}
+
 async function loadMaterialsPage(pageNumber) {
     const listContainer = document.getElementById('reviewersList');
+    const statsContainer = document.getElementById('materialsStats');
     listContainer.innerHTML = '<div class="loading"><div class="spinner"></div><p class="loading-text">Loading your materials...</p></div>';
+    if (statsContainer) statsContainer.style.display = 'none';
 
     try {
         const response = await fetch(`${API_URL}/reviewer`, {
@@ -1127,6 +1315,8 @@ async function loadMaterialsPage(pageNumber) {
         const allMaterials = [...uploadedMaterials, ...importedMaterials];
         totalMaterialsCount = allMaterials.length;
 
+        renderMaterialsStats(uploadedMaterials, importedMaterials);
+
         const startIndex = (pageNumber - 1) * materialsPageSize;
         const endIndex = startIndex + materialsPageSize;
         const paginatedMaterials = allMaterials.slice(startIndex, endIndex);
@@ -1135,7 +1325,9 @@ async function loadMaterialsPage(pageNumber) {
         if (allMaterials.length === 0) {
             listContainer.innerHTML = `
                 <div class="empty-state">
-                    <div class="empty-icon">📚</div>
+                    <div class="empty-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v14a2 2 0 00-2-2H4a2 2 0 00-2 2z"></path><path d="M22 6a2 2 0 00-2-2h-6a2 2 0 00-2 2v14a2 2 0 012-2h6a2 2 0 012 2z"></path></svg>
+                    </div>
                     <h3>No Materials Yet</h3>
                     <p>Upload your first study file or import a quiz to begin!</p>
                 </div>
@@ -1143,13 +1335,20 @@ async function loadMaterialsPage(pageNumber) {
             return;
         }
 
-        // Helper function to check if exam date is within 7 days
-        const isExamUrgent = (examDate) => {
+        const getExamStatus = (examDate) => {
             const today = new Date();
+            today.setHours(0, 0, 0, 0);
             const exam = new Date(examDate);
-            const diffTime = exam - today;
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-            return diffDays <= 7 && diffDays >= 0;
+            exam.setHours(0, 0, 0, 0);
+            const diffDays = Math.round((exam - today) / (1000 * 60 * 60 * 24));
+
+            if (diffDays === 0) {
+                return { label: 'Today', className: 'today' };
+            }
+            if (diffDays > 0 && diffDays <= 7) {
+                return { label: 'Upcoming', className: 'upcoming' };
+            }
+            return { label: 'Scheduled', className: 'scheduled' };
         };
 
         // Build paginated list HTML
@@ -1157,17 +1356,18 @@ async function loadMaterialsPage(pageNumber) {
         paginatedMaterials.forEach(material => {
             if (material.fileName) {
                 // Uploaded material
-                const isUrgent = isExamUrgent(material.examDate);
+                const examStatus = getExamStatus(material.examDate);
                 materialsHTML += `
                     <div class="material-card">
                         <div class="material-header">
-                            <div class="material-icon">📄</div>
+                            <div class="material-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H7a2 2 0 00-2 2v16a2 2 0 002 2h10a2 2 0 002-2V8z"></path><path d="M13 2v6h6"></path></svg>
+                            </div>
                             <div class="material-info">
                                 <h3>${material.fileName}</h3>
-                                <p>💾 ${(material.fileSize / 1024).toFixed(2)} KB • ${material.textLength} characters</p>
-                                <span class="exam-date-badge ${isUrgent ? 'urgent' : ''}">
-                                    📅 Exam: ${new Date(material.examDate).toLocaleDateString()}
-                                    ${isUrgent ? ' • SOON!' : ''}
+                                <span class="exam-date-badge status-${examStatus.className}">
+                                    <span class="exam-status">${examStatus.label}</span>
+                                    <span class="exam-date-text">${new Date(material.examDate).toLocaleDateString()}</span>
                                 </span>
                             </div>
                         </div>
@@ -1182,10 +1382,16 @@ async function loadMaterialsPage(pageNumber) {
                 materialsHTML += `
                     <div class="material-card">
                         <div class="material-header">
-                            <div class="material-icon">📖</div>
+                            <div class="material-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15V6a2 2 0 00-2-2h-4"></path><path d="M3 6a2 2 0 012-2h4"></path><path d="M3 6v12a2 2 0 002 2h5"></path><path d="M21 15v3a2 2 0 01-2 2h-5"></path><path d="M12 2v20"></path></svg>
+                            </div>
                             <div class="material-info">
                                 <h3>${material.title}</h3>
-                                <p>📝 ${material.type.replace('-', ' ').toUpperCase()} • ${material.questions.length} questions</p>
+                                <p class="material-meta">
+                                    <span>${material.type.replace('-', ' ').toUpperCase()}</span>
+                                    <span class="meta-separator" aria-hidden="true"></span>
+                                    <span>${material.questions.length} questions</span>
+                                </p>
                             </div>
                         </div>
                         <div class="material-actions">
@@ -1587,6 +1793,18 @@ function startQuiz(reviewerId) {
     document.getElementById('questionCount').value = '10';
     document.getElementById('specialInstructions').value = '';
     
+    // Reset new options
+    const oneByOneToggle = document.getElementById('oneByOneToggle');
+    const shuffleToggle = document.getElementById('shuffleToggle');
+    const timerToggle = document.getElementById('timerToggle');
+    const timerInputGroup = document.getElementById('timerInputGroup');
+    const timerMinutes = document.getElementById('timerMinutes');
+    if (oneByOneToggle) oneByOneToggle.checked = false;
+    if (shuffleToggle) shuffleToggle.checked = false;
+    if (timerToggle) timerToggle.checked = false;
+    if (timerInputGroup) timerInputGroup.style.display = 'none';
+    if (timerMinutes) timerMinutes.value = '10';
+    
     const modalTrueFalseGroup = document.getElementById('modalTrueFalseGroup');
     if (modalTrueFalseGroup) {
         const dropdown = document.getElementById('modalTrueFalseType');
@@ -1630,6 +1848,12 @@ const generateWithSettings = throttle(async function() {
     
     const instructions = document.getElementById('specialInstructions').value.trim();
     
+    // Read new quiz options
+    isOneByOneMode = document.getElementById('oneByOneToggle')?.checked || false;
+    isShuffleEnabled = document.getElementById('shuffleToggle')?.checked || false;
+    isTimerEnabled = document.getElementById('timerToggle')?.checked || false;
+    timerDuration = parseInt(document.getElementById('timerMinutes')?.value) || 10;
+    
     const typesToGenerate = [...selectedQuizTypes];
     
     console.log('✅ Types to generate:', typesToGenerate);
@@ -1667,7 +1891,7 @@ const generateWithSettings = throttle(async function() {
         if (data.success) {
             quizTitle.textContent = `Mixed Quiz (${typesToGenerate.join(', ')})`;
             displayQuestions(data.questions, typesToGenerate);
-            showAlert('✔ Quiz generated successfully!', 'success');
+            showAlert('Quiz generated successfully!', 'success');
         } else {
             quizContent.innerHTML = `<p style="color: var(--error); text-align: center;">Failed to generate questions: ${data.error}</p>`;
             showAlert('Failed to generate quiz', 'error');
@@ -2033,27 +2257,51 @@ function displayQuestions(questionsText, questionTypes) {
                 continue;
             }
             
-            // === IDENTIFICATION (if no options found) ===
+            // === SHORT ANSWER: fill-blank / identification / enumeration ===
             const nextLine = lines[i + 1];
             if (nextLine && nextLine.startsWith('A:')) {
                 const answer = nextLine.substring(2).trim();
+                const isFillBlank = question.includes('_____') || question.includes('____');
+                const isEnumeration = Boolean(answer.match(/^\d+\.\s/)) ||
+                                     (answer.includes(',') && answer.split(',').length >= 3);
                 
-                currentQuestions.push({ 
-                    question, 
-                    answer, 
-                    type: 'identification' 
-                });
-                
-                html += `
-                    <div class="question-card">
-                        <span class="question-number">Question ${questionNum}</span>
-                        <div class="question-text">${question}</div>
-                        <input type="text" class="form-control" id="answer-${questionNum}" placeholder="Type your answer here">
-                        <div class="explanation" id="explain-${questionNum}">
-                            <strong>Correct Answer:</strong> ${answer}
+                if (isEnumeration) {
+                    currentQuestions.push({ question, answer, type: 'enumeration' });
+                    html += `
+                        <div class="question-card">
+                            <span class="question-number">Question ${questionNum}</span>
+                            <div class="question-text">${question}</div>
+                            <textarea class="form-control" id="answer-${questionNum}" rows="4" placeholder="List all items, one per line or separated by commas..."></textarea>
+                            <div class="explanation" id="explain-${questionNum}">
+                                <strong>Correct Answer:</strong> ${answer}
+                            </div>
                         </div>
-                    </div>
-                `;
+                    `;
+                } else if (isFillBlank) {
+                    currentQuestions.push({ question, answer, type: 'fill-blank' });
+                    html += `
+                        <div class="question-card">
+                            <span class="question-number">Question ${questionNum}</span>
+                            <div class="question-text">${question}</div>
+                            <input type="text" class="form-control fill-blank-input" id="answer-${questionNum}" placeholder="Fill in the blank...">
+                            <div class="explanation" id="explain-${questionNum}">
+                                <strong>Correct Answer:</strong> ${answer}
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    currentQuestions.push({ question, answer, type: 'identification' });
+                    html += `
+                        <div class="question-card">
+                            <span class="question-number">Question ${questionNum}</span>
+                            <div class="question-text">${question}</div>
+                            <input type="text" class="form-control" id="answer-${questionNum}" maxlength="50" placeholder="Short answer (1–2 words)...">
+                            <div class="explanation" id="explain-${questionNum}">
+                                <strong>Correct Answer:</strong> ${answer}
+                            </div>
+                        </div>
+                    `;
+                }
                 questionNum++;
                 i += 2;
                 continue;
@@ -2067,17 +2315,50 @@ function displayQuestions(questionsText, questionTypes) {
     if (html) {
         quizContent.innerHTML = html;
         
-        const cards = quizContent.querySelectorAll('.question-card');
-        cards.forEach((card, index) => {
-            card.style.animation = `slideInFromLeft 0.4s ease-out ${index * 0.1}s both`;
+        const allCards = Array.from(quizContent.querySelectorAll('.question-card'));
+        
+        // Assign data-card-index to each card
+        allCards.forEach((card, idx) => card.setAttribute('data-card-index', idx));
+        
+        // Shuffle if enabled (Fisher-Yates on DOM + currentQuestions in sync)
+        if (isShuffleEnabled && allCards.length > 1) {
+            for (let k = allCards.length - 1; k > 0; k--) {
+                const j = Math.floor(Math.random() * (k + 1));
+                [allCards[k], allCards[j]] = [allCards[j], allCards[k]];
+                [currentQuestions[k], currentQuestions[j]] = [currentQuestions[j], currentQuestions[k]];
+            }
+            allCards.forEach(card => quizContent.appendChild(card));
+            // Reassign indices after shuffle
+            allCards.forEach((card, idx) => card.setAttribute('data-card-index', idx));
+        }
+        
+        // Animate cards
+        Array.from(quizContent.querySelectorAll('.question-card')).forEach((card, index) => {
+            const delay = isOneByOneMode ? 0 : index * 0.1;
+            card.style.animation = `slideInFromLeft 0.4s ease-out ${delay}s both`;
         });
         
-        console.log(`✓ Successfully parsed ${questionNum - 1} questions`);
+        console.log(`Successfully parsed ${questionNum - 1} questions`);
+        
+        // Initialize one-by-one mode
+        if (isOneByOneMode) {
+            currentQuestionIndex = 0;
+            Array.from(quizContent.querySelectorAll('.question-card')).forEach((card, idx) => {
+                if (idx !== 0) card.classList.add('card-hidden');
+            });
+            document.getElementById('quizNav').style.display = 'flex';
+            updateQuizNav();
+        }
+        
+        // Start timer
+        if (isTimerEnabled) {
+            startTimer(timerDuration);
+        }
     } else {
         quizContent.innerHTML = `
             <div style="text-align: center; padding: 40px;">
                 <p style="color: var(--error); font-size: 18px; margin-bottom: 20px;">
-                    ⚠ Could not parse questions from AI response
+                    Could not parse questions from AI response
                 </p>
                 <p style="color: var(--text-muted); margin-bottom: 20px;">
                     The AI generated text in an unexpected format. Try regenerating the quiz.
@@ -2087,6 +2368,106 @@ function displayQuestions(questionsText, questionTypes) {
         `;
     }
 }
+
+// ===== ONE-BY-ONE NAVIGATION =====
+function updateQuizNav() {
+    const allCards = Array.from(document.querySelectorAll('#quizContent .question-card'));
+    const total = allCards.length;
+    document.getElementById('questionCounter').textContent = `${currentQuestionIndex + 1} / ${total}`;
+    document.getElementById('prevBtn').disabled = currentQuestionIndex === 0;
+    document.getElementById('nextBtn').disabled = currentQuestionIndex === total - 1;
+}
+
+function goToQuestion(index) {
+    const allCards = Array.from(document.querySelectorAll('#quizContent .question-card'));
+    if (index < 0 || index >= allCards.length) return;
+    allCards[currentQuestionIndex]?.classList.add('card-hidden');
+    currentQuestionIndex = index;
+    allCards[currentQuestionIndex]?.classList.remove('card-hidden');
+    updateQuizNav();
+}
+
+function nextQuestion() {
+    const allCards = document.querySelectorAll('#quizContent .question-card');
+    if (currentQuestionIndex < allCards.length - 1) {
+        goToQuestion(currentQuestionIndex + 1);
+    }
+}
+
+function prevQuestion() {
+    if (currentQuestionIndex > 0) {
+        goToQuestion(currentQuestionIndex - 1);
+    }
+}
+
+// ===== TIMER =====
+function toggleTimerInput() {
+    const enabled = document.getElementById('timerToggle')?.checked;
+    document.getElementById('timerInputGroup').style.display = enabled ? 'block' : 'none';
+}
+
+function startTimer(minutes) {
+    timerSecondsLeft = minutes * 60;
+    const display = document.getElementById('timerDisplay');
+    const countdown = document.getElementById('timerCountdown');
+    if (display) display.style.display = 'flex';
+    
+    function tick() {
+        const m = Math.floor(timerSecondsLeft / 60).toString().padStart(2, '0');
+        const s = (timerSecondsLeft % 60).toString().padStart(2, '0');
+        if (countdown) countdown.textContent = `${m}:${s}`;
+        
+        if (timerSecondsLeft <= 60 && display) display.classList.add('timer-warning');
+        
+        if (timerSecondsLeft <= 0) {
+            stopTimer();
+            showAlert('⏰ Time is up! Submitting quiz...', 'warning', 4000);
+            setTimeout(() => submitQuiz(), 1500);
+            return;
+        }
+        timerSecondsLeft--;
+    }
+    
+    tick();
+    timerInterval = setInterval(tick, 1000);
+}
+
+function stopTimer() {
+    if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+    }
+    const display = document.getElementById('timerDisplay');
+    if (display) {
+        display.style.display = 'none';
+        display.classList.remove('timer-warning');
+    }
+}
+
+// ===== KEYBOARD CONTROLS =====
+document.addEventListener('keydown', function(event) {
+    if (!isInQuiz || quizSubmitted) return;
+    // Don't hijack when user is typing in an input/textarea
+    const tag = document.activeElement?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+    
+    if (isOneByOneMode && event.key === 'Enter' && event.ctrlKey) {
+        event.preventDefault();
+        nextQuestion();
+        return;
+    }
+    
+    if (['1', '2', '3', '4'].includes(event.key)) {
+        const currentCard = document.querySelector(`#quizContent .question-card[data-card-index="${currentQuestionIndex}"]`)
+            || document.querySelector('#quizContent .question-card:not(.card-hidden)');
+        if (!currentCard) return;
+        const options = currentCard.querySelectorAll('.option');
+        const optionIndex = parseInt(event.key) - 1;
+        if (options[optionIndex]) {
+            options[optionIndex].click();
+        }
+    }
+});
 
 // ===== AI-POWERED ANSWER CHECKING =====
 async function checkAnswerWithAI(userAnswer, correctAnswer, questionText) {
@@ -2149,7 +2530,7 @@ const submitQuiz = throttle(async function() {
         if (!confirmed) return;
     }
     
-    showAlert('🔍 Checking your answers with AI...', 'info', 3000);
+    showAlert('Checking your answers with AI...', 'info', 3000);
     
     let correct = 0;
     let total = 0;
@@ -2158,21 +2539,38 @@ const submitQuiz = throttle(async function() {
         total++;
 
             if (question.classList.contains('matching-card')) {
-                const isComplete = question.dataset.complete === 'true' || question.dataset.complete === true;
-            if (isComplete) {
-                correct++;
-                question.style.borderColor = 'var(--success)';
-            } else {
-                question.style.borderColor = 'var(--error)';
+                const questionNum = parseInt(question.dataset.questionNum);
+                const matchData = window.matchingData?.[questionNum];
+                
+                let matchedPairsCount = 0;
+                let totalPairsCount = 0;
+                
+                if (matchData) {
+                    matchedPairsCount = matchData.matchedPairs;
+                    totalPairsCount = matchData.totalPairs;
+                } else {
+                    totalPairsCount = question.querySelectorAll('.matching-item[data-col="1"]').length;
+                }
+                
+                if (totalPairsCount > 0) {
+                    correct += matchedPairsCount / totalPairsCount;
+                }
+                
+                if (matchedPairsCount === totalPairsCount && totalPairsCount > 0) {
+                    question.style.borderColor = 'var(--success)';
+                } else if (matchedPairsCount === 0) {
+                    question.style.borderColor = 'var(--error)';
+                } else {
+                    question.style.borderColor = 'var(--yellow)';
+                }
+                
+                question.querySelectorAll('.matching-item').forEach(item => {
+                    item.style.pointerEvents = 'none';
+                    item.style.opacity = '0.7';
+                });
+                
+                continue; 
             }
-            
-            question.querySelectorAll('.matching-item').forEach(item => {
-                item.style.pointerEvents = 'none';
-                item.style.opacity = '0.7';
-            });
-            
-            continue; 
-        }
         
         const textInput = question.querySelector('input[type="text"]');
         if (textInput) {
@@ -2224,28 +2622,28 @@ const submitQuiz = throttle(async function() {
         const summary = document.createElement('div');
         summary.className = 'results-summary';
         
-        let emoji = '🎉';
+        let resultBadge = 'Great';
         let message = '';
         
         if (percentage >= 90) {
-            emoji = '🏆';
+            resultBadge = 'Mastery';
             message = 'Outstanding! You\'ve mastered this material!';
         } else if (percentage >= 80) {
-            emoji = '🎉';
+            resultBadge = 'Excellent';
             message = 'Excellent work! You have a strong understanding!';
         } else if (percentage >= 70) {
-            emoji = '👍';
+            resultBadge = 'Good';
             message = 'Good job! Review the explanations to improve further.';
         } else if (percentage >= 60) {
-            emoji = '📚';
+            resultBadge = 'Practice';
             message = 'Keep practicing! Check the explanations below.';
         } else {
-            emoji = '💪';
+            resultBadge = 'Retry';
             message = 'Don\'t give up! Review and try again.';
         }
         
         summary.innerHTML = `
-            <div class="results-emoji">${emoji}</div>
+            <div class="results-badge">${resultBadge}</div>
             <h2>Quiz Results</h2>
             <div class="score-display">${correct} / ${total}</div>
             <div class="percentage">${percentage}%</div>
@@ -2260,7 +2658,7 @@ const submitQuiz = throttle(async function() {
         quizSubmitted = true;
         showChatbot();
         
-        showAlert(`✓ Quiz submitted! You scored ${percentage}%`, percentage >= 70 ? 'success' : 'warning', 6000);
+        showAlert(`Quiz submitted! You scored ${percentage}%`, percentage >= 70 ? 'success' : 'warning', 6000);
     }
 }, 3000); // 3 second throttle
 
@@ -2590,6 +2988,13 @@ function selectMatching(element, questionNum) {
 
 function selectOption(element, questionNum) {
     const container = element.parentElement;
+
+    // Toggle off if user clicks the already-selected option
+    if (element.classList.contains('selected')) {
+        element.classList.remove('selected');
+        return;
+    }
+
     container.querySelectorAll('.option').forEach(opt => opt.classList.remove('selected'));
     element.classList.add('selected');
 }
@@ -2624,6 +3029,14 @@ async function deleteReviewer(reviewerId) {
 function exitQuiz() {
     isInQuiz = false; 
     resetSessionTimer(); 
+    
+    // Stop timer and reset one-by-one state
+    stopTimer();
+    isOneByOneMode = false;
+    isShuffleEnabled = false;
+    isTimerEnabled = false;
+    currentQuestionIndex = 0;
+    document.getElementById('quizNav').style.display = 'none';
     
     showAppPage();
     document.querySelector('[data-page="materials"]').click();
@@ -2668,7 +3081,7 @@ function updateOnlineStatus() {
             const offlineBar = document.createElement('div');
             offlineBar.id = 'offlineIndicator';
             offlineBar.className = 'offline-indicator';
-            offlineBar.innerHTML = '⚠ Offline - Limited functionality available';
+            offlineBar.innerHTML = 'Offline - Limited functionality available';
             appPage.insertBefore(offlineBar, appPage.firstChild);
         }
     } else {
