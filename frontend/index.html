@@ -395,13 +395,13 @@ Answer: B
             <div class="quiz-header">
                 <h1 id="quizTitle">Quiz</h1>
                 <div id="quizProgress"></div>
-                <div id="quizNav" class="quiz-nav" style="display:none;">
-                    <button class="nav-btn-quiz" onclick="prevQuestion()" id="prevBtn" disabled>← Prev</button>
-                    <span id="questionCounter" class="question-counter">1 / ?</span>
-                    <button class="nav-btn-quiz" onclick="nextQuestion()" id="nextBtn">Next →</button>
-                </div>
             </div>
             <div id="quizContent"></div>
+            <div id="quizNav" class="quiz-nav" style="display:none;">
+                <button class="nav-btn-quiz" onclick="prevQuestion()" id="prevBtn" disabled>← Prev</button>
+                <span id="questionCounter" class="question-counter">1 / ?</span>
+                <button class="nav-btn-quiz" onclick="nextQuestion()" id="nextBtn">Next →</button>
+            </div>
             <div class="quiz-actions">
                 <button class="btn-secondary" onclick="exitQuiz()">Exit</button>
                 <button class="btn-primary" onclick="submitQuiz()" id="submitBtn">Submit Answers</button>

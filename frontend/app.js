@@ -2617,6 +2617,15 @@ const submitQuiz = throttle(async function() {
     
     if (total > 0) {
         const percentage = ((correct / total) * 100).toFixed(1);
+
+        // After submission, reveal all questions even when one-by-one mode was enabled
+        document.querySelectorAll('#quizContent .question-card').forEach(card => {
+            card.classList.remove('card-hidden');
+        });
+        const quizNav = document.getElementById('quizNav');
+        if (quizNav) {
+            quizNav.style.display = 'none';
+        }
         
         const quizContent = document.getElementById('quizContent');
         const summary = document.createElement('div');

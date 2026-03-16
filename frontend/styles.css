@@ -3790,7 +3790,7 @@ body.light-mode #uploadConfirmationModal .modal-section {
     align-items: center;
     justify-content: center;
     gap: 16px;
-    margin-top: 16px;
+    margin: 14px 0 10px;
 }
 
 .nav-btn-quiz {
