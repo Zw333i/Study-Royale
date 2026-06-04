@@ -4,10 +4,15 @@ const router = express.Router();
 const { db } = require('../firebase');
 const { verifyToken } = require('./auth');
 
+function getTodayDateOnly() {
+  return new Date().toISOString().split('T')[0];
+}
+
 // GET ALL reviewers for user
 router.get('/', verifyToken, async (req, res) => {
   try {
     const userId = req.user.uid; 
+    const today = getTodayDateOnly();
 
     console.log('Fetching reviewers for userId:', userId);
 
@@ -18,8 +23,16 @@ router.get('/', verifyToken, async (req, res) => {
     console.log('Found documents:', reviewersSnapshot.size);
 
     const reviewers = [];
+    const deletePromises = [];
     reviewersSnapshot.forEach(doc => {
       const data = doc.data();
+
+      // Fail-safe cleanup: remove expired items while loading materials.
+      if (data.examDate && data.examDate < today) {
+        deletePromises.push(doc.ref.delete());
+        return;
+      }
+
       reviewers.push({
         id: doc.id,
         fileName: data.fileName,
@@ -29,6 +42,11 @@ router.get('/', verifyToken, async (req, res) => {
         textLength: data.textLength || 0
       });
     });
+
+    if (deletePromises.length > 0) {
+      await Promise.all(deletePromises);
+      console.log(`Deleted ${deletePromises.length} expired reviewer(s) during fetch`);
+    }
 
     // Sort in JavaScript instead of Firestore
     reviewers.sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate));
@@ -51,6 +69,7 @@ router.get('/:reviewerId', verifyToken, async (req, res) => {
   try {
     const { reviewerId } = req.params;
     const userId = req.user.uid;
+    const today = getTodayDateOnly();
 
     console.log('Fetching single reviewer:', reviewerId, 'for user:', userId);
 
@@ -66,6 +85,12 @@ router.get('/:reviewerId', verifyToken, async (req, res) => {
     if (reviewerData.userId !== userId) {
       console.log('Unauthorized access attempt for reviewer:', reviewerId);
       return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    // If expired, delete and treat as not found.
+    if (reviewerData.examDate && reviewerData.examDate < today) {
+      await reviewerDoc.ref.delete();
+      return res.status(404).json({ error: 'Reviewer not found' });
     }
 
     console.log('Successfully fetched reviewer:', reviewerId);

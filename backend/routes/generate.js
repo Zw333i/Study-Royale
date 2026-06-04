@@ -158,19 +158,129 @@ async function generateQuestions(text, questionTypes, count = 10, specialInstruc
     if (finalValidation.isValid) {
       console.log('SUCCESS! All questions validated.');
       console.log(`Total generated: ${Object.values(finalValidation.counts).reduce((a, b) => a + b, 0)} questions`);
-      return allQuestions;
+      return normalizeTotalQuestionCount(allQuestions, count);
     } else {
       console.warn(`âš ï¸  Validation has issues:`, finalValidation.issues);
       
       if (attempt === maxAttempts) {
-        console.log('ðŸ"‹ Max attempts reached. Returning best effort result.');
-        return allQuestions;
+        console.log('ðŸ"‹ Max attempts reached. Running final exact-count normalization.');
+        const normalizedQuestions = await enforceExactCountOnFinalAttempt(
+          allQuestions,
+          text,
+          typesToGenerate,
+          count,
+          finalValidation
+        );
+        return normalizeTotalQuestionCount(normalizedQuestions, count);
       }
       
       console.log('ðŸ"„ Retrying with stronger instructions...');
       continue;
     }
   }
+}
+
+function getExpectedCountsByType(typesToGenerate, totalCount) {
+  const list = Array.isArray(typesToGenerate) ? typesToGenerate : [typesToGenerate];
+  const base = Math.floor(totalCount / list.length);
+  const remainder = totalCount % list.length;
+
+  const expected = {};
+  list.forEach((type, index) => {
+    expected[type] = base + (index < remainder ? 1 : 0);
+  });
+
+  return expected;
+}
+
+function normalizeTotalQuestionCount(text, targetCount) {
+  if (!text || targetCount <= 0) return text;
+
+  const lines = text.split('\n');
+  const blocks = [];
+  let currentBlock = [];
+
+  const isBlockStart = (line) => {
+    const l = line.trim();
+    if (!l) return false;
+    return (
+      l.startsWith('Q:') ||
+      l.startsWith('Statement:') ||
+      l.startsWith('Scenario:') ||
+      l.startsWith('Front:') ||
+      l.startsWith('Column A |')
+    );
+  };
+
+  for (const line of lines) {
+    if (isBlockStart(line) && currentBlock.length > 0) {
+      blocks.push(currentBlock.join('\n').trim());
+      currentBlock = [];
+    }
+    if (line.trim() || currentBlock.length > 0) {
+      currentBlock.push(line);
+    }
+  }
+
+  if (currentBlock.length > 0) {
+    blocks.push(currentBlock.join('\n').trim());
+  }
+
+  if (blocks.length <= targetCount) {
+    return text;
+  }
+
+  return blocks.slice(0, targetCount).join('\n\n').trim();
+}
+
+async function enforceExactCountOnFinalAttempt(allQuestions, sourceText, typesToGenerate, totalCount, validation) {
+  const expectedCounts = getExpectedCountsByType(typesToGenerate, totalCount);
+  const currentCounts = validation?.counts || {};
+
+  const missingByType = [];
+  for (const type of typesToGenerate) {
+    const expected = expectedCounts[type] || 0;
+    const actual = currentCounts[type] || 0;
+    if (actual < expected) {
+      missingByType.push({ type, needed: expected - actual });
+    }
+  }
+
+  let output = allQuestions;
+
+  for (const missing of missingByType) {
+    if (missing.needed <= 0) continue;
+
+    try {
+      console.log(`Final recovery: generating ${missing.needed} ${missing.type} question(s)`);
+      const geminiPrompt = buildGeminiPrompt(sourceText, missing.type, missing.needed);
+
+      const completion = await validatorAI.chat.completions.create({
+        model: 'google/gemini-flash-1.5',
+        messages: [
+          {
+            role: 'system',
+            content: `Generate EXACTLY ${missing.needed} ${missing.type} questions. Output only questions in the exact format.`
+          },
+          { role: 'user', content: geminiPrompt }
+        ],
+        temperature: 0.3,
+        max_tokens: 2500
+      });
+
+      let recovered = completion.choices?.[0]?.message?.content?.trim() || '';
+      recovered = recovered.replace(/^(Here are|Here's|Below are|I've generated).*?:\s*/i, '').trim();
+      recovered = trimQuestionsToCount(recovered, missing.type, missing.needed);
+
+      if (recovered) {
+        output += `\n\n${recovered}\n`;
+      }
+    } catch (error) {
+      console.error(`Final recovery failed for ${missing.type}:`, error.message);
+    }
+  }
+
+  return output;
 }
 
 // Validate and count questions - NOW TAKES questionsData
@@ -294,9 +404,13 @@ async function validateAndFixQuestions(text, expectedTypes, expectedCount) {
         const answerLine = lines[i + 1];
         if (answerLine && answerLine.startsWith('A:')) {
         const answer = answerLine.substring(2).trim();
+        const questionText = line.substring(2).trim();
+        const isFillBlank = questionText.includes('_____') || questionText.includes('___') || /fill\s+in\s+the\s+blank/i.test(questionText);
         const isEnumeration = answer.match(/^\d+\.\s/) || 
                               (answer.includes(',') && answer.split(',').length >= 2);
-        if (isEnumeration) {
+        if (isFillBlank) {
+            questionCounts['fill-blank']++;
+        } else if (isEnumeration) {
             questionCounts['enumeration']++;
         } else {
             questionCounts['identification']++;
@@ -983,9 +1097,13 @@ async function validateAndFixQuestions(text, expectedTypes, expectedCount) {
         const answerLine = lines[i + 1];
         if (answerLine && answerLine.startsWith('A:')) {
         const answer = answerLine.substring(2).trim();
+        const questionText = line.substring(2).trim();
+        const isFillBlank = questionText.includes('_____') || questionText.includes('___') || /fill\s+in\s+the\s+blank/i.test(questionText);
         const isEnumeration = answer.match(/^\d+\.\s/) || 
                               (answer.includes(',') && answer.split(',').length >= 2);
-        if (isEnumeration) {
+        if (isFillBlank) {
+            questionCounts['fill-blank']++;
+        } else if (isEnumeration) {
             questionCounts['enumeration']++;
         } else {
             questionCounts['identification']++;

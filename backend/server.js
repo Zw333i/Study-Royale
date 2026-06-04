@@ -121,7 +121,7 @@ app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
 
-cron.schedule('0 0 * * *', async () => {
+async function runAutoDeleteJob() {
   console.log('Running auto-delete job...');
   try {
     const deleteRoute = require('./routes/delete');
@@ -130,6 +130,11 @@ cron.schedule('0 0 * * *', async () => {
   } catch (error) {
     console.error('Auto-delete failed:', error);
   }
+}
+
+// Run every hour as a reliability improvement.
+cron.schedule('0 * * * *', runAutoDeleteJob, {
+  timezone: process.env.CRON_TIMEZONE || 'UTC'
 });
 
 const PORT = process.env.PORT || 3000;
@@ -137,6 +142,9 @@ app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🔒 Rate limiting enabled`);
+
+  // Run once at startup so expired records are cleaned immediately after deploy/restart.
+  runAutoDeleteJob();
 });
 
 module.exports = app; 
