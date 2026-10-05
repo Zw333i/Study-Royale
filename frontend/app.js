@@ -1331,7 +1331,8 @@ async function saveImportedQuizToDatabase(title, type, questionsText, associatio
                 associationType: associationType
             }, {
                 allowedKeys: ['title', 'type', 'questionsText', 'associationType'],
-                maxTextLength: 5000,
+                maxTextLength: 30000,
+                preserveWhitespace: true,
                 defaultValues: {}
             }))
         });

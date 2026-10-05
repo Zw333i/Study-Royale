@@ -162,7 +162,12 @@ ${questionsText}`
       role: 'system',
       content: 'You are a quiz parser. Return ONLY valid JSON with no markdown or explanation. Use this shape: {"questions":[...]}. Extract all questions from the input text no matter the format.'
     },
-    { role: 'user', content: prompts[type] || prompts['multiple-choice'] }
+    {
+      role: 'user',
+      content: `${prompts[type] || prompts['multiple-choice']}
+
+IMPORTANT: Parse every question in the supplied text. Do not stop early, summarize, or return a partial list. The output must contain one item for each question found.`
+    }
   ];
 
   let completion;
@@ -190,7 +195,7 @@ ${questionsText}`
         messages,
         model: provider.model,
         temperature: 0.1,
-        max_tokens: 3000,
+        max_tokens: 8000,
         response_format: { type: 'json_object' }
       });
       break;
@@ -221,6 +226,15 @@ ${questionsText}`
       console.error('AI import response was not parseable JSON:', response.slice(0, 500));
       throw new Error('No valid JSON found in AI response');
     }
+
+    const locallyRecognizedQuestions = parseQuestionsWithoutAI(questionsText, type);
+    if (locallyRecognizedQuestions.length > parsed.length) {
+      console.warn(
+        `AI returned ${parsed.length} questions, but the input contains ${locallyRecognizedQuestions.length} recognizable questions; using the complete local result`
+      );
+      return locallyRecognizedQuestions;
+    }
+
     return parsed;
   } catch (error) {
     console.error('AI parsing error:', error);

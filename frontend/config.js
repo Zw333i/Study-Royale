@@ -36,6 +36,7 @@ function normalizeRequestBody(input, options = {}) {
         maxTextLength = 2000,
         allowedKeys = null,
         trimStrings = true,
+        preserveWhitespace = false,
         defaultValues = {},
         maxArrayLength = 25
     } = options;
@@ -62,8 +63,10 @@ function normalizeRequestBody(input, options = {}) {
         }
 
         if (typeof value === 'string') {
-            const cleaned = (trimStrings ? value.trim() : value)
-                .replace(/\s+/g, ' ')
+            const normalized = trimStrings ? value.trim() : value;
+            const cleaned = (preserveWhitespace
+                ? normalized.replace(/[^\S\r\n]+/g, ' ')
+                : normalized.replace(/\s+/g, ' '))
                 .slice(0, maxTextLength);
 
             if (cleaned === '') {
