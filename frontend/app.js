@@ -1,6 +1,9 @@
 // app.js
 // Use CONFIG from config.js to automatically detect environment
 const API_URL = window.CONFIG ? window.CONFIG.getApiUrl() : 'http://localhost:3000/api';
+const AUTH_REQUIRED = window.CONFIG && typeof window.CONFIG.isAuthRequired === 'function'
+    ? window.CONFIG.isAuthRequired()
+    : true;
 
 let currentUser = null;
 let currentReviewerId = null;
@@ -61,6 +64,19 @@ function debounce(func, delay = 500) {
         clearTimeout(timeoutId);
         timeoutId = setTimeout(() => func.apply(this, args), delay);
     };
+}
+
+function buildSafeRequestBody(payload, options = {}) {
+    if (typeof window === 'undefined' || typeof window.normalizeRequestBody !== 'function') {
+        return payload;
+    }
+
+    try {
+        return window.normalizeRequestBody(payload, options);
+    } catch (error) {
+        console.warn('Request sanitization failed:', error);
+        return payload;
+    }
 }
 
 // ===== SESSION TIMEOUT =====
@@ -126,30 +142,47 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 
+function initializeGuestMode() {
+    currentUser = {
+        uid: (window.CONFIG && window.CONFIG.DEV_USER_ID) || 'local-dev-user',
+        displayName: 'Local User',
+        email: 'local@studyroyale.dev'
+    };
+    userToken = null;
+    importedQuizzes = [];
+
+    showAppPage();
+    loadImportedQuizzes();
+    loadReviewers();
+    showAlert('Guest mode enabled. Authentication is bypassed.', 'info', 3500);
+}
+
 // ===== AUTH STATE OBSERVER =====
-auth.onAuthStateChanged(async (user) => {
-    if (user) {
-        currentUser = user;
-        userToken = await user.getIdToken();
-        resetSessionTimer();
-        await loadImportedQuizzes();
-        showAppPage();
-        loadReviewers();
-        
-        // Update both desktop and mobile usernames
-        const displayName = user.displayName || user.email;
-        const userNameElement = document.getElementById('userName');
-        const mobileUserNameElement = document.getElementById('mobileUserName');
-        if (userNameElement) userNameElement.textContent = displayName;
-        if (mobileUserNameElement) mobileUserNameElement.textContent = displayName;
-    } else {
-        clearTimeout(sessionTimeout);
-        currentUser = null;
-        userToken = null;
-        importedQuizzes = [];
-        showAuthPage();
-    }
-});
+if (AUTH_REQUIRED) {
+    auth.onAuthStateChanged(async (user) => {
+        if (user) {
+            currentUser = user;
+            userToken = await user.getIdToken();
+            resetSessionTimer();
+            await loadImportedQuizzes();
+            showAppPage();
+            loadReviewers();
+            
+            // Update both desktop and mobile usernames
+            const displayName = user.displayName || user.email;
+            const userNameElement = document.getElementById('userName');
+            const mobileUserNameElement = document.getElementById('mobileUserName');
+            if (userNameElement) userNameElement.textContent = displayName;
+            if (mobileUserNameElement) mobileUserNameElement.textContent = displayName;
+        } else {
+            clearTimeout(sessionTimeout);
+            currentUser = null;
+            userToken = null;
+            importedQuizzes = [];
+            showAuthPage();
+        }
+    });
+}
 
 // ===== DARK MODE TOGGLE =====
 function toggleDarkMode() {
@@ -164,6 +197,7 @@ function toggleDarkMode() {
     const isLightMode = body.classList.contains('light-mode');
     if (desktopSwitch) desktopSwitch.checked = isLightMode;
     if (mobileSwitch) mobileSwitch.checked = isLightMode;
+    localStorage.setItem('studyRoyaleTheme', isLightMode ? 'light' : 'dark');
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -187,15 +221,23 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
-    // Default to light mode on initial load
-    document.body.classList.add('light-mode');
+    // Force dark mode by default to match the app design; only honor explicit light preference.
+    const storedTheme = localStorage.getItem('studyRoyaleTheme');
+    const forceLightMode = storedTheme === 'light';
+    document.body.classList.toggle('light-mode', forceLightMode);
+    if (!storedTheme) {
+        localStorage.setItem('studyRoyaleTheme', 'dark');
+    }
     const switchElement = document.getElementById('switch');
     const desktopSwitch = document.getElementById('switch-desktop');
-    if (switchElement) switchElement.checked = true;
-    if (desktopSwitch) desktopSwitch.checked = true;
+    const isLightMode = document.body.classList.contains('light-mode');
+    if (switchElement) switchElement.checked = isLightMode;
+    if (desktopSwitch) desktopSwitch.checked = isLightMode;
     
-    if (!currentUser) {
+    if (AUTH_REQUIRED && !currentUser) {
         showAuthPage();
+    } else if (!AUTH_REQUIRED) {
+        initializeGuestMode();
     }
 
     initializeUploadDropzone();
@@ -295,10 +337,22 @@ function showAppPage() {
     document.getElementById('appPage').classList.add('active');
     document.getElementById('quizPage').style.display = 'none';
     document.getElementById('quizPage').classList.remove('active');
+
+    switchAppSection('dashboard');
     
     const userNameElement = document.getElementById('userName');
     if (userNameElement && currentUser) {
         userNameElement.textContent = currentUser.displayName || currentUser.email;
+    }
+
+    const mobileUserNameElement = document.getElementById('mobileUserName');
+    if (mobileUserNameElement && currentUser) {
+        mobileUserNameElement.textContent = currentUser.displayName || currentUser.email;
+    }
+
+    const userMenu = document.getElementById('userMenu');
+    if (userMenu && !AUTH_REQUIRED) {
+        userMenu.innerHTML = '';
     }
     
     document.body.style.overflow = 'auto';
@@ -315,6 +369,7 @@ function showQuizPage() {
     document.getElementById('appPage').classList.remove('active');
     document.getElementById('quizPage').style.display = 'block';
     document.getElementById('quizPage').classList.add('active');
+    document.body.classList.remove('one-page-tab');
     document.body.style.overflow = 'auto';
 }
 
@@ -604,6 +659,12 @@ async function verifyPhoneCode() {
 }
 
 async function logout() {
+    if (!AUTH_REQUIRED) {
+        closeUserMenu();
+        showAlert('Guest mode is active. Logout is disabled.', 'info');
+        return;
+    }
+
     try {
         clearTimeout(sessionTimeout);
         await auth.signOut();
@@ -623,16 +684,43 @@ function showAlert(message, type = 'success', duration = 5000) {
     alert.className = `alert alert-${type}`;
     
     const icons = {
-        success: '✓',
-        error: '✕',
-        warning: '!',
-        info: 'ℹ'
+        success: `
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M20 6L9 17l-5-5"></path>
+            </svg>
+        `,
+        error: `
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="9"></circle>
+                <path d="M9 9l6 6"></path>
+                <path d="M15 9l-6 6"></path>
+            </svg>
+        `,
+        warning: `
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 3l10 18H2L12 3z"></path>
+                <path d="M12 9v4"></path>
+                <path d="M12 17h.01"></path>
+            </svg>
+        `,
+        info: `
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="9"></circle>
+                <path d="M12 10v6"></path>
+                <path d="M12 7h.01"></path>
+            </svg>
+        `
     };
     
     alert.innerHTML = `
         <span class="alert-icon">${icons[type] || icons.info}</span>
         <span class="alert-message">${message}</span>
-        <button class="alert-close" onclick="this.parentElement.remove()">×</button>
+        <button class="alert-close" aria-label="Dismiss alert" onclick="this.parentElement.remove()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M18 6L6 18"></path>
+                <path d="M6 6l12 12"></path>
+            </svg>
+        </button>
     `;
     
     container.appendChild(alert);
@@ -662,6 +750,60 @@ function showLoadingOverlay(message = 'Loading...') {
         </div>
     `;
     document.body.appendChild(overlay);
+}
+
+function switchAppSection(page) {
+    const onePageSections = new Set(['dashboard', 'upload', 'import']);
+    document.body.classList.toggle('one-page-tab', onePageSections.has(page));
+
+    const navItems = document.querySelectorAll('.nav-item');
+    navItems.forEach(nav => nav.classList.toggle('active', nav.dataset.page === page));
+
+    document.querySelectorAll('.section').forEach(section => {
+        section.classList.remove('active');
+    });
+
+    const sectionMap = {
+        dashboard: 'dashboardSection',
+        upload: 'uploadSection',
+        import: 'importSection',
+        materials: 'materialsSection'
+    };
+
+    const sectionId = sectionMap[page];
+    if (sectionId) {
+        const section = document.getElementById(sectionId);
+        if (section) {
+            section.classList.add('active');
+        }
+    }
+
+    if (page === 'materials') {
+        loadReviewers();
+    }
+}
+
+function updateQuizMeta({ mode, progressText, progressValue, timerText }) {
+    const modeLabel = document.getElementById('quizModeLabel');
+    const progressSummary = document.getElementById('quizProgressSummary');
+    const timerSummary = document.getElementById('quizTimerSummary');
+    const progressBar = document.getElementById('quizProgress');
+
+    if (modeLabel && mode) {
+        modeLabel.textContent = mode;
+    }
+
+    if (progressSummary && progressText) {
+        progressSummary.textContent = progressText;
+    }
+
+    if (timerSummary && typeof timerText === 'string') {
+        timerSummary.textContent = timerText;
+    }
+
+    if (progressBar && typeof progressValue === 'number') {
+        progressBar.style.width = `${Math.max(0, Math.min(100, progressValue))}%`;
+    }
 }
 
 function hideLoadingOverlay() {
@@ -820,23 +962,7 @@ document.addEventListener('DOMContentLoaded', () => {
     navItems.forEach(item => {
         item.addEventListener('click', (e) => {
             e.preventDefault();
-            const page = item.dataset.page;
-            
-            navItems.forEach(nav => nav.classList.remove('active'));
-            item.classList.add('active');
-            
-            document.querySelectorAll('.section').forEach(section => {
-                section.classList.remove('active');
-            });
-            
-            if (page === 'upload') {
-                document.getElementById('uploadSection').classList.add('active');
-            } else if (page === 'import') {
-                document.getElementById('importSection').classList.add('active');
-            } else if (page === 'materials') {
-                document.getElementById('materialsSection').classList.add('active');
-                loadReviewers();
-            }
+            switchAppSection(item.dataset.page);
         });
     });
 });
@@ -1190,12 +1316,16 @@ async function saveImportedQuizToDatabase(title, type, questionsText, associatio
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${userToken}`
             },
-            body: JSON.stringify({
+            body: JSON.stringify(buildSafeRequestBody({
                 title: title,
                 type: type,
                 questionsText: questionsText,
                 associationType: associationType
-            })
+            }, {
+                allowedKeys: ['title', 'type', 'questionsText', 'associationType'],
+                maxTextLength: 5000,
+                defaultValues: {}
+            }))
         });
 
         const data = await response.json();
@@ -1462,6 +1592,12 @@ function startImportedQuiz(quizId) {
     const quizContent = document.getElementById('quizContent');
     
     quizTitle.textContent = quiz.title;
+    updateQuizMeta({
+        mode: quiz.type.replace(/-/g, ' '),
+        progressText: `${quiz.questions.length} questions`,
+        progressValue: 100,
+        timerText: 'Off'
+    });
     
     if (quiz.type === 'multiple-choice' || quiz.type === 'association') {
         quizContent.innerHTML = displayImportedMultipleChoice(quiz.questions);
@@ -1614,6 +1750,12 @@ async function startLearnMode() {
     const quizContent = document.getElementById('quizContent');
     
     quizTitle.textContent = 'Learn Mode';
+    updateQuizMeta({
+        mode: 'Learn Mode',
+        progressText: 'Chat',
+        progressValue: 100,
+        timerText: 'Off'
+    });
     
     // Get reviewer data
     try {
@@ -1653,8 +1795,8 @@ function renderLearnMode() {
                 <h1>Learn Mode</h1>
                 <h2>AI Study Assistant</h2>
                 <figure class="avatar">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path>
                     </svg>
                 </figure>
             </div>
@@ -1676,7 +1818,7 @@ function renderLearnMode() {
                 </div>
             </div>
             <div class="message-box">
-                <textarea class="message-input" id="learnInput" placeholder="Ask questions about your study material! :) "></textarea>
+                <textarea class="message-input" id="learnInput" placeholder="Ask questions about your study material!"></textarea>
                 <button type="submit" class="message-submit" id="sendLearnBtn">Send</button>
             </div>
         </div>
@@ -1742,11 +1884,15 @@ async function sendLearnMessage() {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${userToken}`
             },
-            body: JSON.stringify({
+            body: JSON.stringify(buildSafeRequestBody({
                 message: message,
                 reviewerId: currentLearnReviewerId,
                 conversationHistory: learnMessages
-            })
+            }, {
+                allowedKeys: ['message', 'reviewerId', 'conversationHistory'],
+                maxTextLength: 4000,
+                defaultValues: {}
+            }))
         });
         
         const data = await response.json();
@@ -1844,7 +1990,7 @@ const generateWithSettings = throttle(async function() {
         return;
     }
     
-    showAlert('ðŸ"„ Generating your quiz...', 'info', 3000);
+    showAlert('Generating your quiz...', 'info', 3000);
     
     const instructions = document.getElementById('specialInstructions').value.trim();
     
@@ -1858,12 +2004,16 @@ const generateWithSettings = throttle(async function() {
     
     console.log('✅ Types to generate:', typesToGenerate);
     
-    const requestBody = {
+    const requestBody = buildSafeRequestBody({
         reviewerId: currentReviewerId,
         questionTypes: typesToGenerate,
         count: parseInt(count),
         specialInstructions: instructions
-    };
+    }, {
+        allowedKeys: ['reviewerId', 'questionTypes', 'count', 'specialInstructions'],
+        maxTextLength: 4000,
+        defaultValues: {}
+    });
     
     console.log('Request body being sent:', requestBody);
     
@@ -1875,6 +2025,12 @@ const generateWithSettings = throttle(async function() {
 
     quizContent.innerHTML = '<div class="loading"><div class="spinner"></div><p class="loading-text">AI is generating your personalized quiz...</p></div>';
     quizTitle.textContent = `Generating ${typesToGenerate.length} type(s) of quiz...`;
+    updateQuizMeta({
+        mode: 'Custom quiz',
+        progressText: 'Preparing',
+        progressValue: 15,
+        timerText: isTimerEnabled ? `${timerDuration} min` : 'Off'
+    });
 
     try {
         const response = await fetch(`${API_URL}/generate`, {
@@ -2348,6 +2504,13 @@ function displayQuestions(questionsText, questionTypes) {
             });
             document.getElementById('quizNav').style.display = 'flex';
             updateQuizNav();
+        } else {
+            updateQuizMeta({
+                mode: questionTypes.join(', '),
+                progressText: `${questionNum - 1} questions`,
+                progressValue: 100,
+                timerText: isTimerEnabled ? `${timerDuration} min` : 'Off'
+            });
         }
         
         // Start timer
@@ -2373,9 +2536,14 @@ function displayQuestions(questionsText, questionTypes) {
 function updateQuizNav() {
     const allCards = Array.from(document.querySelectorAll('#quizContent .question-card'));
     const total = allCards.length;
-    document.getElementById('questionCounter').textContent = `${currentQuestionIndex + 1} / ${total}`;
+    const counter = document.getElementById('questionCounter');
+    if (counter) counter.textContent = `${currentQuestionIndex + 1} / ${total}`;
     document.getElementById('prevBtn').disabled = currentQuestionIndex === 0;
     document.getElementById('nextBtn').disabled = currentQuestionIndex === total - 1;
+    updateQuizMeta({
+        progressText: `${currentQuestionIndex + 1} / ${total}`,
+        progressValue: total > 0 ? ((currentQuestionIndex + 1) / total) * 100 : 0
+    });
 }
 
 function goToQuestion(index) {
@@ -2416,12 +2584,13 @@ function startTimer(minutes) {
         const m = Math.floor(timerSecondsLeft / 60).toString().padStart(2, '0');
         const s = (timerSecondsLeft % 60).toString().padStart(2, '0');
         if (countdown) countdown.textContent = `${m}:${s}`;
+        updateQuizMeta({ timerText: `${m}:${s}` });
         
         if (timerSecondsLeft <= 60 && display) display.classList.add('timer-warning');
         
         if (timerSecondsLeft <= 0) {
             stopTimer();
-            showAlert('⏰ Time is up! Submitting quiz...', 'warning', 4000);
+            showAlert('Time is up! Submitting quiz...', 'warning', 4000);
             setTimeout(() => submitQuiz(), 1500);
             return;
         }
@@ -2442,6 +2611,7 @@ function stopTimer() {
         display.style.display = 'none';
         display.classList.remove('timer-warning');
     }
+    updateQuizMeta({ timerText: 'Off' });
 }
 
 // ===== KEYBOARD CONTROLS =====
@@ -2471,6 +2641,14 @@ document.addEventListener('keydown', function(event) {
 
 // ===== AI-POWERED ANSWER CHECKING =====
 async function checkAnswerWithAI(userAnswer, correctAnswer, questionText) {
+    const normalizedUserAnswer = String(userAnswer || '').trim();
+    const normalizedCorrectAnswer = String(correctAnswer || '').trim();
+    const normalizedQuestionText = String(questionText || '').trim();
+
+    if (!normalizedUserAnswer || !normalizedCorrectAnswer || !normalizedQuestionText) {
+        return normalizedUserAnswer.toLowerCase() === normalizedCorrectAnswer.toLowerCase();
+    }
+
     try {
         const response = await fetch(`${API_URL}/generate/check-answer`, {
             method: 'POST',
@@ -2478,11 +2656,15 @@ async function checkAnswerWithAI(userAnswer, correctAnswer, questionText) {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${userToken}`
             },
-            body: JSON.stringify({
-                userAnswer: userAnswer,
-                correctAnswer: correctAnswer,
-                questionText: questionText
-            })
+            body: JSON.stringify(buildSafeRequestBody({
+                userAnswer: normalizedUserAnswer,
+                correctAnswer: normalizedCorrectAnswer,
+                questionText: normalizedQuestionText
+            }, {
+                allowedKeys: ['userAnswer', 'correctAnswer', 'questionText'],
+                maxTextLength: 3000,
+                defaultValues: {}
+            }))
         });
 
         const data = await response.json();
@@ -2492,10 +2674,10 @@ async function checkAnswerWithAI(userAnswer, correctAnswer, questionText) {
         }
         
         // Fallback to simple check
-        return userAnswer.toLowerCase().trim() === correctAnswer.toLowerCase().trim();
+        return normalizedUserAnswer.toLowerCase() === normalizedCorrectAnswer.toLowerCase();
     } catch (error) {
         console.error('AI checking error:', error);
-        return userAnswer.toLowerCase().trim() === correctAnswer.toLowerCase().trim();
+        return normalizedUserAnswer.toLowerCase() === normalizedCorrectAnswer.toLowerCase();
     }
 }
 
@@ -2633,13 +2815,31 @@ const submitQuiz = throttle(async function() {
         
         let resultBadge = 'Great';
         let message = '';
+        let resultIcon = `
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="9"></circle>
+                <path d="M8 12l2.5 2.5L16 9"></path>
+            </svg>
+        `;
         
         if (percentage >= 90) {
             resultBadge = 'Mastery';
             message = 'Outstanding! You\'ve mastered this material!';
+            resultIcon = `
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 3l2.7 5.5 6.1.9-4.4 4.2 1 6.1L12 16.9 6.6 19.7l1-6.1-4.4-4.2 6.1-.9L12 3z"></path>
+                </svg>
+            `;
         } else if (percentage >= 80) {
             resultBadge = 'Excellent';
             message = 'Excellent work! You have a strong understanding!';
+            resultIcon = `
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M6 20V10"></path>
+                    <path d="M12 20V4"></path>
+                    <path d="M18 20v-7"></path>
+                </svg>
+            `;
         } else if (percentage >= 70) {
             resultBadge = 'Good';
             message = 'Good job! Review the explanations to improve further.';
@@ -2652,6 +2852,7 @@ const submitQuiz = throttle(async function() {
         }
         
         summary.innerHTML = `
+            <div class="results-icon">${resultIcon}</div>
             <div class="results-badge">${resultBadge}</div>
             <h2>Quiz Results</h2>
             <div class="score-display">${correct} / ${total}</div>
@@ -2666,6 +2867,12 @@ const submitQuiz = throttle(async function() {
         
         quizSubmitted = true;
         showChatbot();
+
+        updateQuizMeta({
+            progressText: `${total} / ${total}`,
+            progressValue: 100,
+            timerText: 'Done'
+        });
         
         showAlert(`Quiz submitted! You scored ${percentage}%`, percentage >= 70 ? 'success' : 'warning', 6000);
     }
@@ -2761,10 +2968,14 @@ async function sendChatMessage() {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${userToken}`
             },
-            body: JSON.stringify({
+            body: JSON.stringify(buildSafeRequestBody({
                 message: message,
                 questions: currentQuestions
-            })
+            }, {
+                allowedKeys: ['message', 'questions'],
+                maxTextLength: 4000,
+                defaultValues: {}
+            }))
         });
         
         const data = await response.json();

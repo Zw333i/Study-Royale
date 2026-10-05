@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#0f1419">
     <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <title>Study Royale</title>
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -199,7 +200,8 @@
         
         <!-- Navigation Menu -->
         <div class="nav-menu" id="navMenu">
-            <a href="#" class="nav-item active" data-page="upload" onclick="closeMobileMenu()">Upload</a>
+            <a href="#" class="nav-item active" data-page="dashboard" onclick="closeMobileMenu()">Home</a>
+            <a href="#" class="nav-item" data-page="upload" onclick="closeMobileMenu()">Upload</a>
             <a href="#" class="nav-item" data-page="import" onclick="closeMobileMenu()">Import</a>
             <a href="#" class="nav-item" data-page="materials" onclick="closeMobileMenu()">My Materials</a>
             
@@ -239,8 +241,108 @@
         </div>
     </nav>
         
+        <!-- Dashboard Section -->
+        <div id="dashboardSection" class="section active">
+            <div class="container dashboard-container">
+                <div class="dashboard-hero">
+                    <div class="dashboard-copy">
+                        <p class="section-eyebrow">
+                            <span class="eyebrow-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M4 19.5V6a2 2 0 012-2h12a2 2 0 012 2v13.5"></path>
+                                    <path d="M4 19.5h16"></path>
+                                    <path d="M8 7h8"></path>
+                                    <path d="M8 11h5"></path>
+                                </svg>
+                            </span>
+                            Study dashboard
+                        </p>
+                        <h1>Start with one file, finish with a stronger memory.</h1>
+                        <p class="dashboard-lead">Upload notes, import quizzes, and review your materials from one calm starting point.</p>
+                        <div class="dashboard-actions">
+                            <button class="btn-primary dashboard-action" onclick="switchAppSection('upload')">
+                                <span class="button-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M13 2H7a2 2 0 00-2 2v16a2 2 0 002 2h10a2 2 0 002-2V8z"></path>
+                                        <path d="M13 2v6h6"></path>
+                                        <path d="M12 11v6"></path>
+                                        <path d="M9 14h6"></path>
+                                    </svg>
+                                </span>
+                                Upload material
+                            </button>
+                            <button class="btn-secondary dashboard-action" onclick="switchAppSection('materials')">Open materials</button>
+                        </div>
+                    </div>
+                    <div class="dashboard-hero-panel">
+                        <div class="dashboard-panel-card">
+                            <span class="panel-label">Fast path</span>
+                            <strong>Upload → Generate → Review</strong>
+                            <p>Use the quick workflow when you want to get from file to quiz in a few taps.</p>
+                        </div>
+                        <div class="dashboard-panel-card dashboard-panel-card-soft">
+                            <span class="panel-label">Focus tip</span>
+                            <p>One-by-one mode is best for deep study. Full quiz mode is best for speed checks.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dashboard-grid">
+                    <article class="dashboard-feature-card">
+                        <div class="feature-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M13 2H7a2 2 0 00-2 2v16a2 2 0 002 2h10a2 2 0 002-2V8z"></path>
+                                <path d="M13 2v6h6"></path>
+                            </svg>
+                        </div>
+                        <h3>Upload once, reuse everywhere</h3>
+                        <p>Turn a PDF, DOCX, or TXT into a quiz-ready material and keep it in your library.</p>
+                    </article>
+                    <article class="dashboard-feature-card">
+                        <div class="feature-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="9"></circle>
+                                <path d="M9 12l2 2 4-4"></path>
+                            </svg>
+                        </div>
+                        <h3>Quiz with less friction</h3>
+                        <p>Choose the exact question types you need and switch between focused or mixed sessions.</p>
+                    </article>
+                    <article class="dashboard-feature-card">
+                        <div class="feature-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 3v18"></path>
+                                <path d="M5 8h14"></path>
+                                <path d="M5 16h14"></path>
+                            </svg>
+                        </div>
+                        <h3>Review what matters</h3>
+                        <p>Keep imported quizzes and uploaded materials together so you always know what to study next.</p>
+                    </article>
+                </div>
+
+                <div class="study-steps">
+                    <div class="study-step-card">
+                        <span class="step-badge">1</span>
+                        <h4>Upload</h4>
+                        <p>Add notes or textbooks, then set your exam date to keep the workflow organized.</p>
+                    </div>
+                    <div class="study-step-card">
+                        <span class="step-badge">2</span>
+                        <h4>Generate</h4>
+                        <p>Pick quiz types, set the question count, and let the AI build a practice set.</p>
+                    </div>
+                    <div class="study-step-card">
+                        <span class="step-badge">3</span>
+                        <h4>Review</h4>
+                        <p>Study one question at a time, review explanations, and check your progress at the end.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Upload Section -->
-        <div id="uploadSection" class="section active">
+        <div id="uploadSection" class="section">
             <div class="container">
                 <div class="page-header">
                     <h1>Upload Study Material</h1>
@@ -392,10 +494,35 @@ Answer: B
         </nav>
 
         <div class="container quiz-container">
-            <div class="quiz-header">
-                <h1 id="quizTitle">Quiz</h1>
-                <div id="quizProgress"></div>
+            <div class="quiz-shell-header">
+                <div class="quiz-header-copy">
+                    <p class="section-eyebrow">
+                        <span class="eyebrow-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 3l2.7 5.5 6.1.9-4.4 4.2 1 6.1L12 16.9 6.6 19.7l1-6.1-4.4-4.2 6.1-.9L12 3z"></path>
+                            </svg>
+                        </span>
+                        Focus mode
+                    </p>
+                    <h1 id="quizTitle">Quiz</h1>
+                    <p class="quiz-intro">Answer at your own pace, then review explanations and correct answers after submission.</p>
+                </div>
+                <div class="quiz-meta-grid">
+                    <div class="quiz-meta-card">
+                        <span>Mode</span>
+                        <strong id="quizModeLabel">Ready</strong>
+                    </div>
+                    <div class="quiz-meta-card">
+                        <span>Progress</span>
+                        <strong id="quizProgressSummary">0 / 0</strong>
+                    </div>
+                    <div class="quiz-meta-card">
+                        <span>Timer</span>
+                        <strong id="quizTimerSummary">Off</strong>
+                    </div>
+                </div>
             </div>
+            <div class="quiz-progress-shell"><div id="quizProgress"></div></div>
             <div id="quizContent"></div>
             <div id="quizNav" class="quiz-nav" style="display:none;">
                 <button class="nav-btn-quiz" onclick="prevQuestion()" id="prevBtn" disabled>← Prev</button>

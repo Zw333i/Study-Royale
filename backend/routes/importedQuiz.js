@@ -2,12 +2,13 @@
 const express = require('express');
 const router = express.Router();
 const Groq = require('groq-sdk');
-const { db, admin } = require('../firebase');
+const { db, FieldValue } = require('../firebase');
 const { verifyToken } = require('./auth');
 
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY
 });
+const GROQ_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
 
 // Use AI to parse and normalize questions
 async function normalizeQuestionsWithAI(questionsText, type, associationType = 'mix') {
@@ -57,7 +58,7 @@ ${questionsText}`
         },
         { role: "user", content: prompts[type] || prompts['multiple-choice'] }
       ],
-      model: "llama-3.3-70b-versatile",
+      model: GROQ_MODEL,
       temperature: 0.1,
       max_tokens: 3000
     });
@@ -106,7 +107,7 @@ router.post('/', verifyToken, async (req, res) => {
       type: type,
       questions: questions,
       associationType: associationType || null,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
       uploadDate: new Date().toISOString()
     });
 

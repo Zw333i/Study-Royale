@@ -1,12 +1,13 @@
 //firebase.js
 const admin = require('firebase-admin');
+const { getFirestore, FieldValue } = require('firebase-admin/firestore');
+const { getAuth } = require('firebase-admin/auth');
 
 // Use environment variable in production, local file in development
 let serviceAccount;
 
 if (process.env.FIREBASE_ADMIN_CONFIG) {
   try {
-    // Parse the JSON from environment variable
     serviceAccount = JSON.parse(process.env.FIREBASE_ADMIN_CONFIG);
     console.log('✅ Using Firebase config from environment variable');
   } catch (error) {
@@ -14,7 +15,6 @@ if (process.env.FIREBASE_ADMIN_CONFIG) {
     throw new Error('Invalid FIREBASE_ADMIN_CONFIG environment variable');
   }
 } else {
-  // Fallback to local file in development
   try {
     serviceAccount = require('./serviceAccountKey.json');
     console.log('✅ Using Firebase config from local file');
@@ -25,10 +25,15 @@ if (process.env.FIREBASE_ADMIN_CONFIG) {
   }
 }
 
+const firebaseCredential = admin.credential && admin.credential.cert
+  ? admin.credential.cert(serviceAccount)
+  : admin.cert(serviceAccount);
+
 admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
+  credential: firebaseCredential
 });
 
-const db = admin.firestore();
+const db = getFirestore();
+const auth = getAuth();
 
-module.exports = { admin, db };
+module.exports = { admin, db, auth, FieldValue };

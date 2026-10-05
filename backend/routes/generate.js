@@ -16,6 +16,7 @@ if (!OpenAI) {
 const primaryAI = new Groq({
   apiKey: process.env.GROQ_API_KEY
 });
+const GROQ_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
 
 const validatorAI = new OpenAI({
   baseURL: "https://openrouter.ai/api/v1",
@@ -65,7 +66,7 @@ async function generateQuestions(text, questionTypes, count = 10, specialInstruc
             },
             { role: "user", content: singleTypePrompt }
           ],
-          model: "llama-3.3-70b-versatile",
+          model: GROQ_MODEL,
           temperature: 0.7,
           max_tokens: 3000
         });
@@ -1421,7 +1422,7 @@ async function checkAnswerWithAI(userAnswer, correctAnswer, questionText) {
           content: `Question: ${questionText}\nCorrect Answer: ${correctAnswer}\nStudent Answer: ${userAnswer}\n\nIs the student's answer correct?` 
         }
       ],
-      model: "llama-3.3-70b-versatile",
+      model: GROQ_MODEL,
       temperature: 0.1,
       max_tokens: 100
     });

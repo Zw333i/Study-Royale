@@ -1,4 +1,4 @@
-const CACHE_NAME = 'study-royale-v1';
+const CACHE_NAME = 'study-royale-v2';
 const urlsToCache = [
   '/',
   '/index.html',
@@ -32,12 +32,14 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Fetch event - Network first, fallback to cache
+// Fetch event - network first for app assets so updates appear immediately
 self.addEventListener('fetch', (event) => {
   // Skip non-GET requests
   if (event.request.method !== 'GET') {
     return;
   }
+
+  const url = new URL(event.request.url);
 
   // Skip API calls - they need network
   if (event.request.url.includes('/api/')) {
@@ -52,27 +54,34 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // For static assets: Cache first, fallback to network
-  event.respondWith(
-    caches.match(event.request).then((response) => {
-      if (response) {
-        return response;
-      }
+  const isStaticAsset = ['.css', '.js', '.html', '.json', '.png', '.jpg', '.svg', '.ico'].some((ext) => url.pathname.endsWith(ext));
 
-      return fetch(event.request).then((response) => {
-        // Don't cache if not successful
-        if (!response || response.status !== 200 || response.type === 'error') {
+  if (isStaticAsset) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (response && response.ok) {
+            const responseClone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseClone));
+          }
           return response;
-        }
+        })
+        .catch(() => caches.match(event.request))
+    );
+    return;
+  }
 
-        // Clone the response
-        const responseToCache = response.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, responseToCache);
-        });
-
-        return response;
-      });
+  event.respondWith(
+    caches.match(event.request).then((cached) => {
+      return fetch(event.request)
+        .then((response) => {
+          if (response && response.ok) {
+            const responseClone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseClone));
+          }
+          return response;
+        })
+        .catch(() => cached || Response.error());
     })
   );
 });

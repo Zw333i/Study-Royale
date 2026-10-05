@@ -4,7 +4,7 @@ const router = express.Router();
 const multer = require('multer');
 const pdfParse = require('pdf-parse');
 const mammoth = require('mammoth');
-const { db, admin } = require('../firebase');
+const { db, FieldValue } = require('../firebase');
 const { verifyToken } = require('./auth');
 const path = require('path');
 const fs = require('fs');
@@ -102,7 +102,7 @@ router.post('/', verifyToken, upload.single('file'), async (req, res) => {
       fileType: fileType,
       textLength: extractedText.length,
       isMerged: false,
-      createdAt: admin.firestore.FieldValue.serverTimestamp()
+      createdAt: FieldValue.serverTimestamp()
     });
 
     // Delete local file
@@ -195,7 +195,7 @@ router.post('/upload-merged', verifyToken, upload.array('files', 10), async (req
       isMerged: true,
       fileCount: fileNames.length,
       mergedFileNames: fileNames,
-      createdAt: admin.firestore.FieldValue.serverTimestamp()
+      createdAt: FieldValue.serverTimestamp()
     });
 
     console.log('Merged files processed successfully');

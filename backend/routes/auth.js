@@ -1,10 +1,20 @@
 // auth.js
 const express = require('express');
 const router = express.Router();
-const { admin, db } = require('../firebase');
+const { auth, db, FieldValue } = require('../firebase');
 
 // Middleware to verify Firebase token
 async function verifyToken(req, res, next) {
+  const disableAuth = process.env.DISABLE_AUTH === 'true';
+
+  if (disableAuth) {
+    req.user = {
+      uid: process.env.DEV_USER_ID || 'local-dev-user',
+      email: 'local@studyroyale.dev'
+    };
+    return next();
+  }
+
   const authHeader = req.headers.authorization;
   
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -14,7 +24,7 @@ async function verifyToken(req, res, next) {
   const token = authHeader.split('Bearer ')[1];
 
   try {
-    const decodedToken = await admin.auth().verifyIdToken(token);
+    const decodedToken = await auth.verifyIdToken(token);
     req.user = decodedToken;
     next();
   } catch (error) {
@@ -32,7 +42,7 @@ router.post('/create-profile', verifyToken, async (req, res) => {
     await db.collection('users').doc(userId).set({
       displayName: displayName || 'Student',
       email: req.user.email,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
       totalQuizzesTaken: 0,
       totalReviewers: 0
     });

@@ -8,6 +8,7 @@ const { verifyToken } = require('./auth');
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY
 });
+const GROQ_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
 
 router.post('/', verifyToken, async (req, res) => {
   try {
@@ -61,7 +62,7 @@ router.post('/', verifyToken, async (req, res) => {
     console.log('Calling Groq API...');
     const completion = await groq.chat.completions.create({
       messages: messages,
-      model: "llama-3.3-70b-versatile",
+      model: GROQ_MODEL,
       temperature: 0.7,
       max_tokens: 800
     });
