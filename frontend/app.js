@@ -195,7 +195,7 @@ function toggleDarkMode() {
     localStorage.setItem('studyRoyaleTheme', isLightMode ? 'light' : 'dark');
     document.querySelector('meta[name="theme-color"]')?.setAttribute(
         'content',
-        isLightMode ? '#f4efe9' : '#101010'
+        isLightMode ? '#ffffff' : '#101010'
     );
 }
 
@@ -233,7 +233,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     document.querySelector('meta[name="theme-color"]')?.setAttribute(
         'content',
-        isLightMode ? '#f4efe9' : '#101010'
+        isLightMode ? '#ffffff' : '#101010'
     );
     
     if (AUTH_REQUIRED && !currentUser) {
