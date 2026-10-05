@@ -43,6 +43,10 @@ body.light-mode {
     color: var(--text-light);
 }
 
+#dashboardSection {
+    display: none !important;
+}
+
 body:not(.light-mode) .navbar {
     background: rgba(20, 22, 28, 0.94);
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
@@ -338,25 +342,10 @@ body.light-mode {
     margin-bottom: 25px;
 }
 
-.logo-section .crown-container {
-    display: none;
-}
-
-.crown-container {
-    width: 10rem;
-    height: 9.64rem;
-    margin: 0 auto 15px;
-    position: relative;
-    transform: scale(0.7);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-
 .nav-brand {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 0;
     min-width: 0;
     font-size: 42px;
     font-weight: 700;
@@ -379,25 +368,6 @@ body.light-mode {
     transform: translateY(1px);
     position: relative;
     z-index: 1;
-    margin-left: 0;
-}
-
-.crown-container-nav {
-    width: 28px;
-    height: 28px;
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    margin-right: 0;
-    overflow: visible;
-    z-index: 2;
-}
-
-.crown-container-nav .king {
-    transform: scale(0.12);
-    transform-origin: center center;
 }
 
 .king {
@@ -1554,7 +1524,6 @@ body.one-page-tab #appPage {
     overflow: visible;
 }
 
-body.one-page-tab #dashboardSection.active,
 body.one-page-tab #uploadSection.active,
 body.one-page-tab #importSection.active {
     min-height: auto;
@@ -1562,7 +1531,6 @@ body.one-page-tab #importSection.active {
     overflow: visible;
 }
 
-body.one-page-tab #dashboardSection .container,
 body.one-page-tab #uploadSection .container,
 body.one-page-tab #importSection .container {
     height: auto;
@@ -4183,7 +4151,6 @@ body.light-mode .loading-overlay-content .spinner::after {
         overflow: visible;
     }
 
-    body.one-page-tab #dashboardSection.active,
     body.one-page-tab #uploadSection.active,
     body.one-page-tab #importSection.active {
         min-height: auto;
@@ -4308,10 +4275,6 @@ body.light-mode .loading-overlay-content .spinner::after {
         font-size: 16px;
     }
     
-    .crown-container-nav {
-        width: 28px;
-        height: 28px;
-    }
 }
 
 /* ===== RESPONSIVE ===== */
@@ -4412,15 +4375,6 @@ body.light-mode .loading-overlay-content .spinner::after {
     
     .nav-brand {
         font-size: 18px;
-    }
-    
-    .crown-container-nav {
-        width: 32px;
-        height: 32px;
-    }
-    
-    .crown-container-nav .king {
-        transform: scale(0.24);
     }
     
     .switch {

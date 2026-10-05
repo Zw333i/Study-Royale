@@ -187,17 +187,16 @@ if (AUTH_REQUIRED) {
 // ===== DARK MODE TOGGLE =====
 function toggleDarkMode() {
     const body = document.body;
-    const desktopSwitch = document.getElementById('switch-desktop');
-    const mobileSwitch = document.getElementById('switch');
-    
-    // Toggle light mode
     body.classList.toggle('light-mode');
-    
-    // Sync both switches
     const isLightMode = body.classList.contains('light-mode');
-    if (desktopSwitch) desktopSwitch.checked = isLightMode;
-    if (mobileSwitch) mobileSwitch.checked = isLightMode;
+    document.querySelectorAll('.switch input').forEach((toggle) => {
+        toggle.checked = isLightMode;
+    });
     localStorage.setItem('studyRoyaleTheme', isLightMode ? 'light' : 'dark');
+    document.querySelector('meta[name="theme-color"]')?.setAttribute(
+        'content',
+        isLightMode ? '#f4efe9' : '#101010'
+    );
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -228,11 +227,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!storedTheme) {
         localStorage.setItem('studyRoyaleTheme', 'dark');
     }
-    const switchElement = document.getElementById('switch');
-    const desktopSwitch = document.getElementById('switch-desktop');
     const isLightMode = document.body.classList.contains('light-mode');
-    if (switchElement) switchElement.checked = isLightMode;
-    if (desktopSwitch) desktopSwitch.checked = isLightMode;
+    document.querySelectorAll('.switch input').forEach((toggle) => {
+        toggle.checked = isLightMode;
+    });
+    document.querySelector('meta[name="theme-color"]')?.setAttribute(
+        'content',
+        isLightMode ? '#f4efe9' : '#101010'
+    );
     
     if (AUTH_REQUIRED && !currentUser) {
         showAuthPage();
@@ -338,7 +340,7 @@ function showAppPage() {
     document.getElementById('quizPage').style.display = 'none';
     document.getElementById('quizPage').classList.remove('active');
 
-    switchAppSection('dashboard');
+    switchAppSection('upload');
     
     const userNameElement = document.getElementById('userName');
     if (userNameElement && currentUser) {
@@ -753,7 +755,7 @@ function showLoadingOverlay(message = 'Loading...') {
 }
 
 function switchAppSection(page) {
-    const onePageSections = new Set(['dashboard', 'upload', 'import']);
+    const onePageSections = new Set(['upload', 'import']);
     document.body.classList.toggle('one-page-tab', onePageSections.has(page));
 
     const navItems = document.querySelectorAll('.nav-item');
@@ -764,7 +766,6 @@ function switchAppSection(page) {
     });
 
     const sectionMap = {
-        dashboard: 'dashboardSection',
         upload: 'uploadSection',
         import: 'importSection',
         materials: 'materialsSection'
@@ -1588,10 +1589,8 @@ function startImportedQuiz(quizId) {
     quizSubmitted = false;
     showQuizPage();
     
-    const quizTitle = document.getElementById('quizTitle');
     const quizContent = document.getElementById('quizContent');
     
-    quizTitle.textContent = quiz.title;
     updateQuizMeta({
         mode: quiz.type.replace(/-/g, ' '),
         progressText: `${quiz.questions.length} questions`,
@@ -1746,10 +1745,8 @@ async function startLearnMode() {
     closeModal();
     showQuizPage();
     
-    const quizTitle = document.getElementById('quizTitle');
     const quizContent = document.getElementById('quizContent');
     
-    quizTitle.textContent = 'Learn Mode';
     updateQuizMeta({
         mode: 'Learn Mode',
         progressText: 'Chat',
@@ -2021,10 +2018,7 @@ const generateWithSettings = throttle(async function() {
     showQuizPage();
 
     const quizContent = document.getElementById('quizContent');
-    const quizTitle = document.getElementById('quizTitle');
-
     quizContent.innerHTML = '<div class="loading"><div class="spinner"></div><p class="loading-text">AI is generating your personalized quiz...</p></div>';
-    quizTitle.textContent = `Generating ${typesToGenerate.length} type(s) of quiz...`;
     updateQuizMeta({
         mode: 'Custom quiz',
         progressText: 'Preparing',
@@ -2045,7 +2039,6 @@ const generateWithSettings = throttle(async function() {
         const data = await response.json();
 
         if (data.success) {
-            quizTitle.textContent = `Mixed Quiz (${typesToGenerate.join(', ')})`;
             displayQuestions(data.questions, typesToGenerate);
             showAlert('Quiz generated successfully!', 'success');
         } else {

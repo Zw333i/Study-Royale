@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#0f1419">
     <link rel="manifest" href="manifest.json">
-    <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <title>Study Royale</title>
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -14,24 +13,6 @@
     <div id="authPage" class="page">
         <div class="auth-container">
             <div class="logo-section">
-                <div class="crown-container">
-                    <div class="king">
-                        <div class="crown">
-                            <div class="crown top-left"></div>
-                            <div class="crown top-middle"></div>
-                            <div class="crown top-right"></div>
-                            <div class="crown back-left"></div>
-                            <div class="crown back-right"></div>
-                            <div class="crown middle"></div>
-                            <div class="crown bottom"></div>
-                        </div>
-                        <div class="jewel">
-                            <div class="jewel red left"></div>
-                            <div class="jewel blue"></div>
-                            <div class="jewel red right"></div>
-                        </div>
-                    </div>
-                </div>
                 <h1 class="brand-title">Study Royale</h1>
                 <p class="brand-subtitle">Master Your Knowledge, Rule Your Exams</p>
             </div>
@@ -167,24 +148,6 @@
     <!-- Navigation Bar -->
     <nav class="navbar">
         <div class="nav-brand">
-            <div class="crown-container-nav">
-                <div class="king">
-                    <div class="crown">
-                        <div class="crown top-left"></div>
-                        <div class="crown top-middle"></div>
-                        <div class="crown top-right"></div>
-                        <div class="crown back-left"></div>
-                        <div class="crown back-right"></div>
-                        <div class="crown middle"></div>
-                        <div class="crown bottom"></div>
-                    </div>
-                    <div class="jewel">
-                        <div class="jewel red left"></div>
-                        <div class="jewel blue"></div>
-                        <div class="jewel red right"></div>
-                    </div>
-                </div>
-            </div>
             <p class="brand-name">Study Royale</p>
         </div>
         
@@ -200,8 +163,7 @@
         
         <!-- Navigation Menu -->
         <div class="nav-menu" id="navMenu">
-            <a href="#" class="nav-item active" data-page="dashboard" onclick="closeMobileMenu()">Home</a>
-            <a href="#" class="nav-item" data-page="upload" onclick="closeMobileMenu()">Upload</a>
+            <a href="#" class="nav-item active" data-page="upload" onclick="closeMobileMenu()">Upload</a>
             <a href="#" class="nav-item" data-page="import" onclick="closeMobileMenu()">Import</a>
             <a href="#" class="nav-item" data-page="materials" onclick="closeMobileMenu()">My Materials</a>
             
@@ -242,7 +204,7 @@
     </nav>
         
         <!-- Dashboard Section -->
-        <div id="dashboardSection" class="section active">
+        <div id="dashboardSection" class="section" aria-hidden="true">
             <div class="container dashboard-container">
                 <div class="dashboard-hero">
                     <div class="dashboard-copy">
@@ -456,24 +418,6 @@ Answer: B
     <div id="quizPage" class="page">
         <nav class="navbar">
             <div class="nav-brand">
-                <div class="crown-container-nav">
-                    <div class="king">
-                        <div class="crown">
-                            <div class="crown top-left"></div>
-                            <div class="crown top-middle"></div>
-                            <div class="crown top-right"></div>
-                            <div class="crown back-left"></div>
-                            <div class="crown back-right"></div>
-                            <div class="crown middle"></div>
-                            <div class="crown bottom"></div>
-                        </div>
-                        <div class="jewel">
-                            <div class="jewel red left"></div>
-                            <div class="jewel blue"></div>
-                            <div class="jewel red right"></div>
-                        </div>
-                    </div>
-                </div>
                 <span class="brand-name">Study Royale</span>
             </div>
             <div id="timerDisplay" class="timer-display" style="display:none;">
@@ -494,35 +438,6 @@ Answer: B
         </nav>
 
         <div class="container quiz-container">
-            <div class="quiz-shell-header">
-                <div class="quiz-header-copy">
-                    <p class="section-eyebrow">
-                        <span class="eyebrow-icon" aria-hidden="true">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M12 3l2.7 5.5 6.1.9-4.4 4.2 1 6.1L12 16.9 6.6 19.7l1-6.1-4.4-4.2 6.1-.9L12 3z"></path>
-                            </svg>
-                        </span>
-                        Focus mode
-                    </p>
-                    <h1 id="quizTitle">Quiz</h1>
-                    <p class="quiz-intro">Answer at your own pace, then review explanations and correct answers after submission.</p>
-                </div>
-                <div class="quiz-meta-grid">
-                    <div class="quiz-meta-card">
-                        <span>Mode</span>
-                        <strong id="quizModeLabel">Ready</strong>
-                    </div>
-                    <div class="quiz-meta-card">
-                        <span>Progress</span>
-                        <strong id="quizProgressSummary">0 / 0</strong>
-                    </div>
-                    <div class="quiz-meta-card">
-                        <span>Timer</span>
-                        <strong id="quizTimerSummary">Off</strong>
-                    </div>
-                </div>
-            </div>
-            <div class="quiz-progress-shell"><div id="quizProgress"></div></div>
             <div id="quizContent"></div>
             <div id="quizNav" class="quiz-nav" style="display:none;">
                 <button class="nav-btn-quiz" onclick="prevQuestion()" id="prevBtn" disabled>← Prev</button>
