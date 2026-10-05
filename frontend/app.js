@@ -1180,6 +1180,13 @@ const proceedWithUpload = throttle(async function() {
             });
 
             const data = await response.json();
+            if (!response.ok) {
+                console.error('Import request failed:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    error: data.error || 'Unknown backend error'
+                });
+            }
 
             if (data.success) {
                 showAlert(`Files merged and uploaded successfully! (${data.fileCount} files combined)`, 'success');
@@ -1341,7 +1348,8 @@ async function saveImportedQuizToDatabase(title, type, questionsText, associatio
             
             document.querySelector('[data-page="materials"]').click();
         } else {
-            showAlert(data.error || 'Failed to import quiz', 'error');
+            const message = data.error || `Import failed (${response.status})`;
+            showAlert(message, 'error');
         }
     } catch (error) {
         console.error('Save error:', error);

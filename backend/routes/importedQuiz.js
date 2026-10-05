@@ -72,6 +72,52 @@ function parseQuestionsWithoutAI(questionsText, type) {
   return questions;
 }
 
+function parseAIQuestionsResponse(response) {
+  const candidates = [];
+  const cleaned = response
+    .replace(/```(?:json)?/gi, '')
+    .replace(/```/g, '')
+    .trim();
+
+  candidates.push(cleaned);
+
+  const arrayStart = cleaned.indexOf('[');
+  const arrayEnd = cleaned.lastIndexOf(']');
+  if (arrayStart !== -1 && arrayEnd > arrayStart) {
+    candidates.push(cleaned.slice(arrayStart, arrayEnd + 1));
+  }
+
+  const objectStart = cleaned.indexOf('{');
+  const objectEnd = cleaned.lastIndexOf('}');
+  if (objectStart !== -1 && objectEnd > objectStart) {
+    candidates.push(cleaned.slice(objectStart, objectEnd + 1));
+  }
+
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+
+      if (parsed && typeof parsed === 'object') {
+        const questions = parsed.questions || parsed.items || parsed.data;
+        if (Array.isArray(questions) && questions.length > 0) {
+          return questions;
+        }
+
+        if (parsed.question || parsed.statement) {
+          return [parsed];
+        }
+      }
+    } catch {
+      // Try the next possible JSON boundary.
+    }
+  }
+
+  return null;
+}
+
 // Use AI to parse and normalize questions
 async function normalizeQuestionsWithAI(questionsText, type, associationType = 'mix') {
   const prompts = {
@@ -114,7 +160,7 @@ ${questionsText}`
   const messages = [
     {
       role: 'system',
-      content: 'You are a quiz parser. You MUST return ONLY valid JSON array, no other text. Extract all questions from the input text no matter the format.'
+      content: 'You are a quiz parser. Return ONLY valid JSON with no markdown or explanation. Use this shape: {"questions":[...]}. Extract all questions from the input text no matter the format.'
     },
     { role: 'user', content: prompts[type] || prompts['multiple-choice'] }
   ];
@@ -144,7 +190,8 @@ ${questionsText}`
         messages,
         model: provider.model,
         temperature: 0.1,
-        max_tokens: 3000
+        max_tokens: 3000,
+        response_format: { type: 'json_object' }
       });
       break;
     } catch (error) {
@@ -169,15 +216,10 @@ ${questionsText}`
       throw new Error('AI returned an empty response');
     }
     
-    // Extract JSON from response (in case there's extra text)
-    const jsonMatch = response.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) {
+    const parsed = parseAIQuestionsResponse(response);
+    if (!parsed) {
+      console.error('AI import response was not parseable JSON:', response.slice(0, 500));
       throw new Error('No valid JSON found in AI response');
-    }
-    
-    const parsed = JSON.parse(jsonMatch[0]);
-    if (!Array.isArray(parsed) || parsed.length === 0) {
-      throw new Error('AI returned no questions');
     }
     return parsed;
   } catch (error) {
