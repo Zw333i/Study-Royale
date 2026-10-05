@@ -20,6 +20,58 @@ const openrouter = new OpenAI({
 });
 const OPENROUTER_MODEL = process.env.OPENROUTER_IMPORT_MODEL || 'google/gemini-flash-1.5';
 
+function parseQuestionsWithoutAI(questionsText, type) {
+  const lines = questionsText
+    .split(/\r?\n/)
+    .map(line => line.trim().replace(/^\d+[.)]\s*/, ''))
+    .filter(Boolean);
+  const questions = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const questionLine = lines[i].match(/^(?:Q|Question):\s*(.+)$/i);
+    const statementLine = lines[i].match(/^Statement:\s*(.+)$/i);
+
+    if (questionLine) {
+      const question = questionLine[1].trim();
+      const options = [];
+      let answer = '';
+      let answerIndex = i + 1;
+
+      for (; answerIndex < lines.length; answerIndex++) {
+        const line = lines[answerIndex];
+        if (/^(?:Q|Question|Statement):/i.test(line)) break;
+        if (/^[A-D][.)]\s*/i.test(line)) {
+          options.push(line);
+        } else if (/^(?:A|Answer|Correct):\s*/i.test(line)) {
+          answer = line.replace(/^(?:A|Answer|Correct):\s*/i, '').trim();
+          break;
+        }
+      }
+
+      if (!answer) continue;
+      if (options.length >= 2 && type === 'multiple-choice') {
+        questions.push({ question, options, correctAnswer: answer, type });
+      } else if (type === 'enumeration') {
+        questions.push({ question, answer, type });
+      } else {
+        questions.push({ question, answer, type: question.includes('_____') ? 'fill-blank' : type });
+      }
+      i = answerIndex;
+      continue;
+    }
+
+    if (statementLine && type === 'true-false') {
+      const answerLine = lines[i + 1]?.match(/^(?:A|Answer|Correct):\s*(.+)$/i);
+      if (answerLine) {
+        questions.push({ statement: statementLine[1].trim(), answer: answerLine[1].trim(), type });
+        i++;
+      }
+    }
+  }
+
+  return questions;
+}
+
 // Use AI to parse and normalize questions
 async function normalizeQuestionsWithAI(questionsText, type, associationType = 'mix') {
   const prompts = {
@@ -102,6 +154,11 @@ ${questionsText}`
   }
 
   if (!completion) {
+    const localQuestions = parseQuestionsWithoutAI(questionsText, type);
+    if (localQuestions.length > 0) {
+      console.log(`AI unavailable; parsed ${localQuestions.length} ${type} questions locally`);
+      return localQuestions;
+    }
     throw new Error(`AI parsing unavailable: ${lastError?.message || 'No AI provider is configured'}`);
   }
 
@@ -119,9 +176,17 @@ ${questionsText}`
     }
     
     const parsed = JSON.parse(jsonMatch[0]);
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      throw new Error('AI returned no questions');
+    }
     return parsed;
   } catch (error) {
     console.error('AI parsing error:', error);
+    const localQuestions = parseQuestionsWithoutAI(questionsText, type);
+    if (localQuestions.length > 0) {
+      console.log(`AI returned an invalid format; parsed ${localQuestions.length} ${type} questions locally`);
+      return localQuestions;
+    }
     throw new Error('Failed to parse questions with AI: ' + error.message);
   }
 }
