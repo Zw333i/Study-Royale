@@ -3496,6 +3496,64 @@ body.light-mode #uploadConfirmationModal .modal-section {
     }
 }
 
+/* ===== CONSISTENT CONTENT WIDTHS ===== */
+@media (min-width: 769px) {
+    .section > .container,
+    .page > .container,
+    body.one-page-tab #uploadSection .container,
+    body.one-page-tab #importSection .container {
+        width: min(100%, 1180px);
+        max-width: 1180px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+}
+
+@media (max-width: 768px) {
+    .section > .container,
+    .page > .container,
+    body.one-page-tab #uploadSection .container,
+    body.one-page-tab #importSection .container {
+        width: 100%;
+        max-width: 100%;
+        margin-left: auto;
+        margin-right: auto;
+    }
+}
+
+/* Keep native and custom scrollbars aligned with the active theme. */
+html {
+    scrollbar-width: thin;
+    scrollbar-color: #3f3f3f transparent;
+}
+
+html::-webkit-scrollbar {
+    width: 10px;
+}
+
+html::-webkit-scrollbar-track {
+    background: #111111;
+}
+
+html::-webkit-scrollbar-thumb {
+    background: #3f3f3f;
+    border: 2px solid #111111;
+    border-radius: 999px;
+}
+
+body.light-mode {
+    scrollbar-color: #c49a22 transparent;
+}
+
+body.light-mode::-webkit-scrollbar-track {
+    background: #fffdf7;
+}
+
+body.light-mode::-webkit-scrollbar-thumb {
+    background: #c49a22;
+    border-color: #fffdf7;
+}
+
 /* ===== OFFLINE INDICATOR ===== */
 .offline-indicator {
     position: fixed;
@@ -4886,6 +4944,27 @@ body.one-page-tab #importSection .upload-card {
 .dropdown-menu button {
     background: transparent;
     color: var(--text-primary);
+}
+
+/* Keep the import example flat and readable in dark mode. */
+.import-example {
+    background: var(--surface-1);
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 4px 0 0;
+}
+
+.import-example h4 {
+    color: var(--text-primary);
+}
+
+.import-example pre {
+    background: var(--surface-2);
+    color: var(--text-primary);
+    border: 0;
+    border-radius: 8px;
+    box-shadow: none;
 }
 
 .material-info h3,
