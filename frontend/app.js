@@ -2073,9 +2073,13 @@ function displayQuestions(questionsText, questionTypes) {
         return;
     }
 
+    const identificationOnly = questionTypes.length === 1 && questionTypes[0] === 'identification';
     const lines = questionsText
     .split('\n')
-    .map(line => line.trim())
+    .map(line => line.trim().replace(/^\d+[.)]\s*/, ''))
+    .map(line => identificationOnly
+        ? line.replace(/^Question:\s*/i, 'Q: ').replace(/^Answer:\s*/i, 'A: ')
+        : line)
     .filter(line => line.length > 0 && !line.toLowerCase().match(/^(here are|and here are|case study|multiple choice|true\/false|identification|enumeration|association|matching|fill in|odd one out|except)/i));
     let html = '';
     let questionNum = 1;

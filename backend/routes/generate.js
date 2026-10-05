@@ -202,7 +202,7 @@ function normalizeTotalQuestionCount(text, targetCount) {
   let currentBlock = [];
 
   const isBlockStart = (line) => {
-    const l = line.trim();
+    const l = line.trim().replace(/^\d+[.)]\s*/, '');
     if (!l) return false;
     return (
       l.startsWith('Q:') ||
@@ -286,7 +286,10 @@ async function enforceExactCountOnFinalAttempt(allQuestions, sourceText, typesTo
 
 // Validate and count questions - NOW TAKES questionsData
 async function validateAndFixQuestions(text, expectedTypes, expectedCount) {
-  const lines = text.split('\n').filter(line => line.trim());
+  const lines = text
+    .split('\n')
+    .map(line => line.trim().replace(/^\d+[.)]\s*/, ''))
+    .filter(line => line);
   
   const questionCounts = {
     'case-study': 0,
@@ -675,7 +678,7 @@ function trimQuestionsToCount(text, questionType, maxCount) {
   }
 
   const isQuestionStart = (line) => {
-    const l = line.trim();
+    const l = line.trim().replace(/^\d+[.)]\s*/, '');
     switch (questionType) {
       case 'multiple-choice':
       case 'identification':

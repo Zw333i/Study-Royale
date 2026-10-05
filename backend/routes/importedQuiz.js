@@ -2,6 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const Groq = require('groq-sdk');
+const OpenAI = require('openai');
 const { db, FieldValue } = require('../firebase');
 const { verifyToken } = require('./auth');
 
@@ -9,6 +10,15 @@ const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY
 });
 const GROQ_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
+const openrouter = new OpenAI({
+  baseURL: 'https://openrouter.ai/api/v1',
+  apiKey: process.env.OPENROUTER_API_KEY,
+  defaultHeaders: {
+    'HTTP-Referer': 'https://study-royale.app',
+    'X-Title': 'Study Royale Quiz Import'
+  }
+});
+const OPENROUTER_MODEL = process.env.OPENROUTER_IMPORT_MODEL || 'google/gemini-flash-1.5';
 
 // Use AI to parse and normalize questions
 async function normalizeQuestionsWithAI(questionsText, type, associationType = 'mix') {
@@ -49,21 +59,58 @@ Text to parse:
 ${questionsText}`
   };
 
-  try {
-    const completion = await groq.chat.completions.create({
-      messages: [
-        { 
-          role: "system", 
-          content: "You are a quiz parser. You MUST return ONLY valid JSON array, no other text. Extract all questions from the input text no matter the format." 
-        },
-        { role: "user", content: prompts[type] || prompts['multiple-choice'] }
-      ],
-      model: GROQ_MODEL,
-      temperature: 0.1,
-      max_tokens: 3000
-    });
+  const messages = [
+    {
+      role: 'system',
+      content: 'You are a quiz parser. You MUST return ONLY valid JSON array, no other text. Extract all questions from the input text no matter the format.'
+    },
+    { role: 'user', content: prompts[type] || prompts['multiple-choice'] }
+  ];
 
-    const response = completion.choices[0].message.content.trim();
+  let completion;
+  let lastError;
+  const providers = [
+    {
+      name: 'Groq',
+      client: groq,
+      model: GROQ_MODEL
+    },
+    {
+      name: 'OpenRouter',
+      client: openrouter,
+      model: OPENROUTER_MODEL
+    }
+  ];
+
+  for (const provider of providers) {
+    try {
+      if (!provider.client.apiKey) {
+        continue;
+      }
+
+      completion = await provider.client.chat.completions.create({
+        messages,
+        model: provider.model,
+        temperature: 0.1,
+        max_tokens: 3000
+      });
+      break;
+    } catch (error) {
+      lastError = error;
+      console.error(`${provider.name} import parsing error:`, error.message);
+    }
+  }
+
+  if (!completion) {
+    throw new Error(`AI parsing unavailable: ${lastError?.message || 'No AI provider is configured'}`);
+  }
+
+  try {
+
+    const response = completion.choices?.[0]?.message?.content?.trim();
+    if (!response) {
+      throw new Error('AI returned an empty response');
+    }
     
     // Extract JSON from response (in case there's extra text)
     const jsonMatch = response.match(/\[[\s\S]*\]/);
@@ -121,7 +168,10 @@ router.post('/', verifyToken, async (req, res) => {
 
   } catch (error) {
     console.error('Import quiz error:', error);
-    res.status(500).json({ error: error.message });
+    const status = error.message.startsWith('AI parsing') || error.message.startsWith('Failed to parse')
+      ? 503
+      : 500;
+    res.status(status).json({ error: error.message });
   }
 });
 
