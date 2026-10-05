@@ -314,11 +314,11 @@
                 <div class="upload-card">
                     <div class="upload-area" onclick="document.getElementById('fileInput').click()">
                         <div class="upload-icon" aria-hidden="true">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M13 2H7a2 2 0 00-2 2v16a2 2 0 002 2h10a2 2 0 002-2V8z"></path>
-                                <path d="M13 2v6h6"></path>
-                                <path d="M8 18l3-3"></path>
-                                <path d="M10 20l5-5"></path>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M14 2H6.5A2.5 2.5 0 004 4.5v15A2.5 2.5 0 006.5 22h11a2.5 2.5 0 002.5-2.5V8z"></path>
+                                <path d="M14 2v6h6"></path>
+                                <path d="M12 17V11"></path>
+                                <path d="m9.5 13.5 2.5-2.5 2.5 2.5"></path>
                             </svg>
                         </div>
                         <h3>Upload your files!</h3>
@@ -432,9 +432,6 @@ Answer: B
                 </span>
                 <span id="timerCountdown">00:00</span>
             </div>
-            <div class="nav-menu">
-                <button class="btn-back" onclick="exitQuiz()">← Back to Materials</button>
-            </div>
         </nav>
 
         <div class="container quiz-container">
@@ -445,7 +442,7 @@ Answer: B
                 <button class="nav-btn-quiz" onclick="nextQuestion()" id="nextBtn">Next →</button>
             </div>
             <div class="quiz-actions">
-                <button class="btn-secondary" onclick="exitQuiz()">Exit</button>
+                <button class="btn-secondary back-materials-action" onclick="exitQuiz()">Back to Materials</button>
                 <button class="btn-primary" onclick="submitQuiz()" id="submitBtn">Submit Answers</button>
             </div>
         </div>

@@ -21,12 +21,82 @@ const app = express();
 app.use(cors({
   origin: process.env.FRONTEND_URL || '*', 
   methods: ['GET', 'POST', 'DELETE', 'PUT'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key'],
   credentials: true
 }));
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+const idempotencyCache = new Map();
+const IDEMPOTENCY_TTL_MS = 10 * 60 * 1000;
+
+app.use((req, res, next) => {
+  if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') {
+    return next();
+  }
+
+  const key = req.get('Idempotency-Key');
+  if (!key || key.length > 200) {
+    return next();
+  }
+
+  // Keep idempotency responses scoped to the caller so a shared key cannot
+  // replay one user's response to another user.
+  const callerScope = req.get('Authorization') || req.ip || 'anonymous';
+  const cacheKey = `${req.method}:${req.originalUrl}:${callerScope}:${key}`;
+  const existing = idempotencyCache.get(cacheKey);
+  if (existing) {
+    if (existing.response) {
+      return res.status(existing.response.status).json(existing.response.body);
+    }
+
+    return existing.promise.then((response) => {
+      res.status(response.status).json(response.body);
+    }).catch(next);
+  }
+
+  let resolvePending;
+  let rejectPending;
+  const pending = new Promise((resolve, reject) => {
+    resolvePending = resolve;
+    rejectPending = reject;
+  });
+
+  idempotencyCache.set(cacheKey, {
+    promise: pending,
+    createdAt: Date.now()
+  });
+
+  const originalJson = res.json.bind(res);
+  res.json = (body) => {
+    const response = { status: res.statusCode, body };
+    idempotencyCache.set(cacheKey, {
+      response,
+      createdAt: Date.now()
+    });
+    resolvePending(response);
+    return originalJson(body);
+  };
+
+  res.on('close', () => {
+    if (!res.writableEnded) {
+      rejectPending(new Error('Idempotent request closed before a response was sent'));
+      idempotencyCache.delete(cacheKey);
+    }
+  });
+
+  return next();
+});
+
+setInterval(() => {
+  const expirationTime = Date.now() - IDEMPOTENCY_TTL_MS;
+  for (const [key, entry] of idempotencyCache.entries()) {
+    if (entry.createdAt < expirationTime) {
+      idempotencyCache.delete(key);
+    }
+  }
+}, IDEMPOTENCY_TTL_MS).unref();
 
 const generateLimiter = rateLimit({
     windowMs: 60 * 1000, 

@@ -86,6 +86,20 @@ const SESSION_DURATION = 30 * 60 * 1000; // 30 minutes
 const SESSION_WARNING_TIME = 5 * 60 * 1000; // 5 minutes before expiry
 let isInQuiz = false;
 let lastActivityTime = Date.now();
+let quizSubmissionInProgress = false;
+const answerCheckCache = new Map();
+const requestIdempotencyKeys = new Map();
+
+function getIdempotencyKey(scope, value = '') {
+    const cacheKey = `${scope}:${value}`;
+    if (!requestIdempotencyKeys.has(cacheKey)) {
+        const id = typeof crypto?.randomUUID === 'function'
+            ? crypto.randomUUID()
+            : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        requestIdempotencyKeys.set(cacheKey, `${scope}-${id}`);
+    }
+    return requestIdempotencyKeys.get(cacheKey);
+}
 
 function resetSessionTimer() {
     lastActivityTime = Date.now();
@@ -1137,6 +1151,7 @@ const proceedWithUpload = throttle(async function() {
                     const response = await fetch(`${API_URL}/upload`, {
                         method: 'POST',
                         headers: {
+                            'Idempotency-Key': getIdempotencyKey('upload', `${selectedUploadFiles[i].name}:${selectedUploadFiles[i].size}:${examDate}`),
                             'Authorization': `Bearer ${userToken}`
                         },
                         body: formData
@@ -1174,6 +1189,7 @@ const proceedWithUpload = throttle(async function() {
             const response = await fetch(`${API_URL}/upload/upload-merged`, {
                 method: 'POST',
                 headers: {
+                    'Idempotency-Key': getIdempotencyKey('upload-merged', `${selectedUploadFiles.map(file => file.name).join('|')}:${examDate}`),
                     'Authorization': `Bearer ${userToken}`
                 },
                 body: formData
@@ -1322,6 +1338,7 @@ async function saveImportedQuizToDatabase(title, type, questionsText, associatio
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Idempotency-Key': getIdempotencyKey('import-quiz', `${title}:${questionsText}`),
                 'Authorization': `Bearer ${userToken}`
             },
             body: JSON.stringify(buildSafeRequestBody({
@@ -1687,6 +1704,7 @@ async function deleteImportedQuizFromDatabase(quizId) {
         const response = await fetch(`${API_URL}/imported-quiz/${quizId}`, {
             method: 'DELETE',
             headers: {
+                'Idempotency-Key': getIdempotencyKey('delete-imported-quiz', quizId),
                 'Authorization': `Bearer ${userToken}`
             }
         });
@@ -1888,6 +1906,7 @@ async function sendLearnMessage() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Idempotency-Key': getIdempotencyKey('learn', `${currentLearnReviewerId}:${message}:${learnMessages.length}`),
                 'Authorization': `Bearer ${userToken}`
             },
             body: JSON.stringify(buildSafeRequestBody({
@@ -2040,6 +2059,7 @@ const generateWithSettings = throttle(async function() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Idempotency-Key': getIdempotencyKey('generate-quiz', `${currentReviewerId}:${count}:${typesToGenerate.join(',')}:${instructions}`),
                 'Authorization': `Bearer ${userToken}`
             },
             body: JSON.stringify(requestBody)
@@ -2655,11 +2675,21 @@ async function checkAnswerWithAI(userAnswer, correctAnswer, questionText) {
         return normalizedUserAnswer.toLowerCase() === normalizedCorrectAnswer.toLowerCase();
     }
 
+    const answerCacheKey = JSON.stringify([
+        normalizedUserAnswer,
+        normalizedCorrectAnswer,
+        normalizedQuestionText
+    ]);
+    if (answerCheckCache.has(answerCacheKey)) {
+        return answerCheckCache.get(answerCacheKey);
+    }
+
     try {
         const response = await fetch(`${API_URL}/generate/check-answer`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Idempotency-Key': getIdempotencyKey('answer-check', answerCacheKey),
                 'Authorization': `Bearer ${userToken}`
             },
             body: JSON.stringify(buildSafeRequestBody({
@@ -2676,6 +2706,7 @@ async function checkAnswerWithAI(userAnswer, correctAnswer, questionText) {
         const data = await response.json();
         
         if (data.success) {
+            answerCheckCache.set(answerCacheKey, data.isCorrect);
             return data.isCorrect;
         }
         
@@ -2689,6 +2720,8 @@ async function checkAnswerWithAI(userAnswer, correctAnswer, questionText) {
 
 // ===== AI CHECKING =====
 const submitQuiz = throttle(async function() {
+    if (quizSubmissionInProgress || quizSubmitted) return;
+
     const questions = document.querySelectorAll('.question-card');
     
     if (questions.length === 0) {
@@ -2718,10 +2751,17 @@ const submitQuiz = throttle(async function() {
         if (!confirmed) return;
     }
     
+    quizSubmissionInProgress = true;
+    const submitButton = document.getElementById('submitBtn');
+    if (submitButton) {
+        submitButton.disabled = true;
+        submitButton.textContent = 'Checking Answers...';
+    }
     showAlert('Checking your answers with AI...', 'info', 3000);
     
-    let correct = 0;
-    let total = 0;
+    try {
+        let correct = 0;
+        let total = 0;
     
     for (const [idx, question] of Array.from(questions).entries()) {
         total++;
@@ -2881,6 +2921,17 @@ const submitQuiz = throttle(async function() {
         });
         
         showAlert(`Quiz submitted! You scored ${percentage}%`, percentage >= 70 ? 'success' : 'warning', 6000);
+        }
+    } catch (error) {
+        console.error('Quiz submission error:', error);
+        showAlert('Unable to finish checking the quiz. Please try again.', 'error');
+    } finally {
+        quizSubmissionInProgress = false;
+        const submitButton = document.getElementById('submitBtn');
+        if (submitButton && !quizSubmitted) {
+            submitButton.disabled = false;
+            submitButton.textContent = 'Submit Quiz';
+        }
     }
 }, 3000); // 3 second throttle
 
@@ -2972,6 +3023,7 @@ async function sendChatMessage() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Idempotency-Key': getIdempotencyKey('chatbot', `${message}:${currentQuestions.length}`),
                 'Authorization': `Bearer ${userToken}`
             },
             body: JSON.stringify(buildSafeRequestBody({
@@ -3235,6 +3287,7 @@ async function deleteReviewer(reviewerId) {
         const response = await fetch(`${API_URL}/delete/${reviewerId}`, {
             method: 'DELETE',
             headers: {
+                'Idempotency-Key': getIdempotencyKey('delete-reviewer', reviewerId),
                 'Authorization': `Bearer ${userToken}`
             }
         });

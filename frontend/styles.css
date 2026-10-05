@@ -147,8 +147,8 @@ body.light-mode .upload-icon {
 body.light-mode .dashboard-feature-card .feature-icon,
 body.light-mode .step-badge,
 body.light-mode .upload-icon {
-    background: rgba(212, 173, 52, 0.15);
-    border-color: rgba(212, 173, 52, 0.18);
+    background: transparent;
+    border-color: transparent;
 }
 
 body.light-mode .dashboard-copy h1,
@@ -1687,21 +1687,21 @@ body.one-page-tab #importSection .import-example {
 }
 
 .upload-icon {
-    width: 72px;
-    height: 72px;
+    width: 48px;
+    height: 48px;
     margin: 0 auto 20px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     color: var(--yellow);
-    background: rgba(212, 173, 52, 0.12);
-    border: 1px solid rgba(212, 173, 52, 0.35);
-    border-radius: 16px;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
 }
 
 .upload-icon svg {
-    width: 38px;
-    height: 38px;
+    width: 42px;
+    height: 42px;
 }
 
 .upload-drop-hint {
@@ -2731,16 +2731,32 @@ body.light-mode .statement-item {
 .quiz-actions {
     display: flex;
     gap: 20px;
-    justify-content: center;
+    align-items: center;
+    justify-content: flex-end;
     margin-top: 40px;
-    padding: 30px;
-    background: var(--card-bg);
-    border-radius: 16px;
-    box-shadow: var(--shadow);
+    padding: 18px 0 8px;
+    background: transparent;
+    border-top: 1px solid var(--border-color);
+    box-shadow: none;
 }
 
 .quiz-actions button {
     min-width: 180px;
+}
+
+.quiz-actions .back-materials-action {
+    margin-right: auto;
+    min-width: auto;
+    border: 0;
+    background: transparent;
+    color: var(--text-secondary);
+    box-shadow: none;
+}
+
+.quiz-actions .back-materials-action:hover {
+    background: transparent;
+    color: var(--text-primary);
+    transform: none;
 }
 
 /* ===== CHATBOT STYLES ===== */
@@ -4420,8 +4436,7 @@ body.light-mode .loading-overlay-content .spinner::after {
     }
 
     .question-card,
-    .results-summary,
-    .quiz-actions {
+    .results-summary {
         padding: 18px 14px;
     }
 
@@ -4436,10 +4451,13 @@ body.light-mode .loading-overlay-content .spinner::after {
 
     .quiz-actions {
         margin-top: 24px;
+        padding: 16px 0 4px;
+        align-items: stretch;
     }
 
     .quiz-actions button {
         min-width: 0;
+        width: 100%;
     }
 
     .matching-container-inline,
