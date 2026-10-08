@@ -1211,7 +1211,13 @@ A) If statement 1 is true
 B) If statement 2 is true
 C) If both are true
 D) If neither is true
-Answer: C</pre>`
+Answer: C</pre>`,
+        'flashcard': `<h4>Format Example (Flashcards — use Front: and Back:):</h4>
+<pre>Front: What is the powerhouse of the cell?
+Back: Mitochondria
+
+Front: What is H2O?
+Back: Water</pre>`
     };
     
     exampleDiv.innerHTML = examples[quizType] || examples['multiple-choice'];
@@ -1542,7 +1548,12 @@ function startImportedQuiz(quizId) {
         timerText: 'Off'
     });
     
-    if (quiz.type === 'multiple-choice' || quiz.type === 'association') {
+    if (quiz.type === 'flashcard') {
+        quizContent.innerHTML = '';
+        document.getElementById('submitBtn').style.display = 'none';
+        currentFlashcardIndex = 0;
+        renderFlashcard();
+    } else if (quiz.type === 'multiple-choice' || quiz.type === 'association') {
         quizContent.innerHTML = displayImportedMultipleChoice(quiz.questions);
     } else if (quiz.type === 'identification') {
         quizContent.innerHTML = displayImportedIdentification(quiz.questions);

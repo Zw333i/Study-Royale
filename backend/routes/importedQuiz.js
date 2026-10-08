@@ -27,6 +27,24 @@ function parseQuestionsWithoutAI(questionsText, type) {
     .filter(Boolean);
   const questions = [];
 
+  if (type === 'flashcard') {
+    for (let i = 0; i < lines.length; i++) {
+      const frontMatch = lines[i].match(/^Front:\s*(.+)$/i);
+      if (!frontMatch) continue;
+
+      const backMatch = lines[i + 1]?.match(/^Back:\s*(.+)$/i);
+      if (backMatch) {
+        questions.push({
+          front: frontMatch[1].trim(),
+          back: backMatch[1].trim(),
+          type
+        });
+        i++;
+      }
+    }
+    return questions;
+  }
+
   for (let i = 0; i < lines.length; i++) {
     const questionLine = lines[i].match(/^(?:Q|Question):\s*(.+)$/i);
     const statementLine = lines[i].match(/^Statement:\s*(.+)$/i);
@@ -152,6 +170,12 @@ ${associationType === 'mix' ? 'Look for both "EXCEPT" questions and "Which does 
 
 Extract each question, options, and the correct answer (the one that does NOT belong or is the exception). Return ONLY valid JSON array with this exact format:
 [{"question": "question text", "options": ["A) option1", "B) option2", "C) option3", "D) option4"], "correctAnswer": "A", "type": "association"}]
+
+Text to parse:
+${questionsText}`,
+
+    'flashcard': `Parse the following text into flashcards. Each card has a front prompt and a back answer. Find every Front:/Back: pair, preserving the complete text. Return ONLY valid JSON array with this exact format:
+[{"front": "front text", "back": "back text", "type": "flashcard"}]
 
 Text to parse:
 ${questionsText}`
