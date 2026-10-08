@@ -86,6 +86,10 @@ const SESSION_WARNING_TIME = 5 * 60 * 1000; // 5 minutes before expiry
 let isInQuiz = false;
 let lastActivityTime = Date.now();
 let quizSubmissionInProgress = false;
+let googleSignInInProgress = false;
+let emailSignInInProgress = false;
+let pendingGoogleCredential = null;
+let pendingGoogleEmail = '';
 const answerCheckCache = new Map();
 const requestIdempotencyKeys = new Map();
 
@@ -401,6 +405,7 @@ function showSignup() {
 
 async function login(event) {
     if (event) event.preventDefault();
+    if (emailSignInInProgress) return;
     
     const email = document.getElementById('loginEmail').value.trim();
     const password = document.getElementById('loginPassword').value;
@@ -427,10 +432,24 @@ async function login(event) {
     const originalText = loginBtn.textContent;
     
     try {
+        emailSignInInProgress = true;
         loginBtn.disabled = true;
         loginBtn.textContent = 'Signing in...';
         
-        await auth.signInWithEmailAndPassword(email, password);
+        const result = await auth.signInWithEmailAndPassword(email, password);
+
+        if (pendingGoogleCredential && pendingGoogleEmail.toLowerCase() === email.toLowerCase()) {
+            try {
+                await result.user.linkWithCredential(pendingGoogleCredential);
+                pendingGoogleCredential = null;
+                pendingGoogleEmail = '';
+                showAlert('Signed in and linked Google to your existing account!', 'success');
+            } catch (linkError) {
+                console.error('Google account linking error:', linkError);
+                showAlert('Signed in successfully, but Google could not be linked. Your existing account was not changed.', 'warning');
+            }
+        }
+
         showAlert('Welcome back!');
     } catch (error) {
         let errorMessage = 'Login failed';
@@ -445,10 +464,13 @@ async function login(event) {
             errorMessage = 'This account has been disabled';
         } else if (error.code === 'auth/too-many-requests') {
             errorMessage = 'Too many failed attempts. Please try again later';
+        } else if (error.code === 'auth/invalid-credential' || error.code === 'auth/invalid-login-credentials') {
+            errorMessage = 'Email/password sign-in failed. If this account was created with Google, use Sign in with Google instead.';
         }
         
         showAlert(errorMessage, 'error');
     } finally {
+        emailSignInInProgress = false;
         loginBtn.disabled = false;
         loginBtn.textContent = originalText;
     }
@@ -507,6 +529,8 @@ async function signup(event) {
             errorMessage = 'Invalid email format';
         } else if (error.code === 'auth/weak-password') {
             errorMessage = 'Password is too weak. Use at least 6 characters';
+        } else if (error.code === 'auth/account-exists-with-different-credential') {
+            errorMessage = 'An account with this email already exists. Sign in using its original provider instead.';
         }
         
         showAlert(errorMessage, 'error');
@@ -517,11 +541,16 @@ async function signup(event) {
 }
 
 async function googleSignIn() {
+    if (googleSignInInProgress) {
+        return;
+    }
+
     const provider = new firebase.auth.GoogleAuthProvider();
     provider.addScope('profile');
     provider.addScope('email');
     
     try {
+        googleSignInInProgress = true;
         const result = await auth.signInWithPopup(provider);
         
         if (!result.user.displayName && result.additionalUserInfo && result.additionalUserInfo.profile && result.additionalUserInfo.profile.name) {
@@ -541,13 +570,19 @@ async function googleSignIn() {
                 console.error('Redirect error:', redirectError);
                 showAlert('Google sign-in is not available. Please use email and password instead.', 'error');
             }
-        } else if (error.code === 'auth/cancelled-popup-request') {
-            // User closed popup
+        } else if (error.code === 'auth/cancelled-popup-request' || error.code === 'auth/popup-closed-by-user') {
+            // The user closed the popup or a duplicate click was cancelled.
         } else if (error.code === 'auth/unauthorized-domain') {
             showAlert('This website domain is not authorized in Firebase. Add it under Authentication > Settings > Authorized domains.', 'error');
+        } else if (error.code === 'auth/account-exists-with-different-credential') {
+            pendingGoogleCredential = error.credential || null;
+            pendingGoogleEmail = error.email || '';
+            showAlert('This email already has a password account. Sign in with that password to safely link Google. No account was overwritten.', 'warning', 7000);
         } else {
             showAlert('Failed to sign in with Google. Try email/password instead.', 'error');
         }
+    } finally {
+        googleSignInInProgress = false;
     }
 }
 
