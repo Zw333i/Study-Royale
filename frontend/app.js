@@ -10,7 +10,6 @@ let currentReviewerId = null;
 let selectedQuizTypes = []; 
 let currentQuestions = [];
 let userToken = null;
-let confirmationResult = null;
 let currentFlashcardIndex = 0;
 let matchingSelections = { column1: null, column2: null };
 let matchedPairs = [];
@@ -393,32 +392,11 @@ function showQuizPage() {
 function showLogin() {
     document.getElementById('loginForm').classList.remove('hidden');
     document.getElementById('signupForm').classList.add('hidden');
-    document.getElementById('phoneForm').classList.add('hidden');
 }
 
 function showSignup() {
     document.getElementById('loginForm').classList.add('hidden');
     document.getElementById('signupForm').classList.remove('hidden');
-    document.getElementById('phoneForm').classList.add('hidden');
-}
-
-function showPhoneAuth() {
-    document.getElementById('loginForm').classList.add('hidden');
-    document.getElementById('signupForm').classList.add('hidden');
-    document.getElementById('phoneForm').classList.remove('hidden');
-    
-    if (!window.recaptchaVerifier) {
-        try {
-            window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
-                'size': 'normal',
-                'callback': () => console.log('reCAPTCHA solved'),
-                'expired-callback': () => showAlert('reCAPTCHA expired. Please try again.', 'error')
-            });
-            window.recaptchaVerifier.render();
-        } catch (error) {
-            console.log('reCAPTCHA initialization:', error);
-        }
-    }
 }
 
 async function login(event) {
@@ -561,10 +539,12 @@ async function googleSignIn() {
                 await auth.signInWithRedirect(provider);
             } catch (redirectError) {
                 console.error('Redirect error:', redirectError);
-                showAlert('Google sign-in not available. Please use email/password or phone authentication.', 'error');
+                showAlert('Google sign-in is not available. Please use email and password instead.', 'error');
             }
         } else if (error.code === 'auth/cancelled-popup-request') {
             // User closed popup
+        } else if (error.code === 'auth/unauthorized-domain') {
+            showAlert('This website domain is not authorized in Firebase. Add it under Authentication > Settings > Authorized domains.', 'error');
         } else {
             showAlert('Failed to sign in with Google. Try email/password instead.', 'error');
         }
@@ -582,97 +562,6 @@ auth.getRedirectResult().then((result) => {
         console.error('Redirect result error:', error);
     }
 });
-
-const sendVerificationCode = throttle(async function() {
-    const phoneNumber = document.getElementById('phoneNumber').value.trim();
-    const sendBtn = document.getElementById('sendCodeBtn');
-    
-    // Validation
-    const errors = [];
-    
-    if (!phoneNumber) {
-        errors.push('Phone number is required');
-    } else if (!phoneNumber.startsWith('+')) {
-        errors.push('Phone number must include country code (e.g., +63)');
-    } else if (!validatePhoneNumber(phoneNumber)) {
-        errors.push('Invalid Philippines phone format. Use: +639171234567');
-    }
-    
-    if (errors.length > 0) {
-        showValidationErrors(errors);
-        return;
-    }
-    
-    const originalText = sendBtn.textContent;
-    sendBtn.disabled = true;
-    sendBtn.textContent = 'Sending...';
-
-    try {
-        if (!window.recaptchaVerifier) {
-            window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
-                'size': 'normal',
-                'callback': () => console.log('reCAPTCHA solved'),
-                'expired-callback': () => showAlert('reCAPTCHA expired. Please try again.', 'error')
-            });
-            await window.recaptchaVerifier.render();
-        }
-        
-        const appVerifier = window.recaptchaVerifier;
-        confirmationResult = await auth.signInWithPhoneNumber(phoneNumber, appVerifier);
-        
-        showAlert('Verification code sent to your phone!', 'success');
-        document.getElementById('verificationCodeSection').classList.remove('hidden');
-        sendBtn.textContent = 'Code Sent';
-        
-    } catch (error) {
-        console.error('SMS send error:', error);
-        
-        let errorMessage = 'Failed to send verification code';
-        
-        if (error.code === 'auth/invalid-phone-number') {
-            errorMessage = 'Invalid phone number format';
-        } else if (error.code === 'auth/too-many-requests') {
-            errorMessage = 'Too many requests. Please try again in a few minutes';
-        } else if (error.code === 'auth/billing-not-enabled') {
-            errorMessage = 'Phone authentication requires a paid Firebase plan. Please use email or Google sign-in instead.';
-        } else if (error.code === 'auth/captcha-check-failed') {
-            errorMessage = 'reCAPTCHA verification failed. Please try again';
-        }
-        
-        showAlert(errorMessage, 'error');
-        sendBtn.disabled = false;
-        sendBtn.textContent = originalText;
-        
-        if (window.recaptchaVerifier) {
-            window.recaptchaVerifier.clear();
-            window.recaptchaVerifier = null;
-        }
-    }
-}, 3000); // 3 second throttle
-
-async function verifyPhoneCode() {
-    const code = document.getElementById('verificationCode').value.trim();
-
-    if (!code || code.length !== 6) {
-        showAlert('Please enter the 6-digit code', 'error');
-        return;
-    }
-
-    try {
-        const result = await confirmationResult.confirm(code);
-        showAlert('Phone verified successfully!');
-        
-        if (!result.user.displayName) {
-            const name = prompt('Enter your display name:');
-            if (name) {
-                await result.user.updateProfile({ displayName: name });
-            }
-        }
-    } catch (error) {
-        console.error('Verification error:', error);
-        showAlert('Invalid verification code', 'error');
-    }
-}
 
 async function logout() {
     if (!AUTH_REQUIRED) {
@@ -874,12 +763,6 @@ function showValidationErrors(errors) {
 function validateEmail(email) {
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return re.test(email);
-}
-
-function validatePhoneNumber(phone) {
-    // Philippines format: +63 followed by 10 digits
-    const re = /^\+63\d{10}$/;
-    return re.test(phone);
 }
 
 function validatePassword(password) {

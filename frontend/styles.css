@@ -3554,6 +3554,53 @@ body.light-mode::-webkit-scrollbar-thumb {
     border-color: #fffdf7;
 }
 
+/* Final navbar sizing overrides must come after all responsive rules. */
+@media (min-width: 769px) {
+    .navbar {
+        display: grid;
+        grid-template-columns: max-content minmax(0, 1fr) max-content;
+        column-gap: 24px;
+    }
+
+    .nav-brand {
+        width: max-content;
+        max-width: none;
+        flex: none;
+    }
+
+    .nav-brand .brand-name {
+        display: block;
+        width: max-content;
+        max-width: none;
+        overflow: visible;
+        text-overflow: clip;
+        white-space: nowrap;
+    }
+
+    .nav-menu {
+        min-width: 0;
+        width: auto;
+        margin: 0;
+    }
+
+    .nav-user {
+        min-width: max-content;
+    }
+}
+
+@media (max-width: 768px) {
+    .nav-brand,
+    .nav-brand .brand-name {
+        max-width: none;
+    }
+
+    .nav-brand .brand-name {
+        overflow: visible;
+        text-overflow: clip;
+        white-space: nowrap;
+    }
+}
+
 /* ===== OFFLINE INDICATOR ===== */
 .offline-indicator {
     position: fixed;

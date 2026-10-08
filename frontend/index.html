@@ -53,14 +53,6 @@
                     </svg>
                     Sign in with Google
                 </button>
-                <button class="btn-social" onclick="showPhoneAuth()">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
-                        <line x1="12" y1="18" x2="12.01" y2="18"></line>
-                    </svg>
-                    Sign in with Phone
-                </button>
-
                 <div class="auth-switch">
                     Don't have an account? <a onclick="showSignup()">Create one</a>
                 </div>
@@ -104,42 +96,11 @@
                     </svg>
                     Sign up with Google
                 </button>
-                <button class="btn-social" onclick="showPhoneAuth()">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
-                        <line x1="12" y1="18" x2="12.01" y2="18"></line>
-                    </svg>
-                    Sign up with Phone
-                </button>
-
                 <div class="auth-switch">
                     Already have an account? <a onclick="showLogin()">Sign in</a>
                 </div>
             </div>
 
-            <!-- Phone Auth Form -->
-            <div id="phoneForm" class="auth-form hidden">
-                <h2>Phone Verification</h2>
-                <div class="form-group">
-                    <label>Phone Number</label>
-                    <input type="tel" id="phoneNumber" placeholder="+639171234567">
-                    <small>Philippines format: +63 followed by 10 digits (e.g., +639171234567)</small>
-                </div>
-                <div id="recaptcha-container"></div>
-                <button class="btn-primary" onclick="sendVerificationCode()" id="sendCodeBtn">Send Code</button>
-
-                <div id="verificationCodeSection" class="hidden">
-                    <div class="form-group">
-                        <label>Verification Code</label>
-                        <input type="text" id="verificationCode" placeholder="6-digit code">
-                    </div>
-                    <button class="btn-primary" onclick="verifyPhoneCode()">Verify</button>
-                </div>
-
-                <div class="auth-switch">
-                    <a onclick="showLogin()">Back to login</a>
-                </div>
-            </div>
         </div>
     </div>
 
